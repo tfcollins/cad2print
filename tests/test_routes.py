@@ -59,3 +59,9 @@ def test_thumbnail_proxy_returns_png(client):
     r = client.get(f"/thumb/d/{DID}/w/{WID}/e/{EID}")
     assert r.status_code == 200 and r.headers["content-type"].startswith("image/png")
     assert r.content == b"\x89PNGfake"
+
+
+def test_document_thumbnail_proxy_returns_png(client):
+    r = client.get(f"/thumb/d/{DID}/w/{WID}")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("image/png")
+    assert r.content == b"\x89PNGdoc"

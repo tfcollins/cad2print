@@ -78,13 +78,18 @@ class OnshapeClient:
         ]
 
     def thumbnail(self, did: str, wvm: str, wvmid: str, eid: str, size: str = "300x170") -> bytes:
-        key = f"{did}/{wvm}/{wvmid}/{eid}/{size}"
-        hit = self._thumbs.get(key)
+        return self._cached_png(f"/thumbnails/d/{did}/{wvm}/{wvmid}/e/{eid}/s/{size}")
+
+    def document_thumbnail(self, did: str, wid: str, size: str = "300x170") -> bytes:
+        return self._cached_png(f"/thumbnails/d/{did}/w/{wid}/s/{size}")
+
+    def _cached_png(self, path: str) -> bytes:
+        hit = self._thumbs.get(path)
         now = time.monotonic()
         if hit and now - hit[0] < _THUMB_TTL_S:
             return hit[1]
-        png = self._get(f"/thumbnails/d/{did}/{wvm}/{wvmid}/e/{eid}/s/{size}", accept="image/png").content
-        self._thumbs[key] = (now, png)
+        png = self._get(path, accept="image/png").content
+        self._thumbs[path] = (now, png)
         return png
 
     # -- export ------------------------------------------------------------------------------

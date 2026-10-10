@@ -132,3 +132,11 @@ def test_export_stl_without_redirect_streams_body(client, tmp_path):
     dest = tmp_path / "p.stl"
     client.export_stl(DID, "w", WID, EID, PID, dest)
     assert dest.read_bytes() == b"DIRECT"
+
+
+@respx.mock
+def test_document_thumbnail_uses_workspace_level_endpoint(client):
+    respx.get(f"{BASE}/api/v9/thumbnails/d/{DID}/w/{WID}/s/300x170").mock(
+        return_value=httpx.Response(200, content=b"\x89PNGdoc", headers={"content-type": "image/png"})
+    )
+    assert client.document_thumbnail(DID, WID) == b"\x89PNGdoc"

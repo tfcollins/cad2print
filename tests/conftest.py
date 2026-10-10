@@ -32,6 +32,9 @@ class FakeOnshape:
     def thumbnail(self, did, wvm, wvmid, eid, size="300x170"):
         return b"\x89PNGfake"
 
+    def document_thumbnail(self, did, wid, size="300x170"):
+        return b"\x89PNGdoc"
+
     def export_stl(self, did, wvm, wvmid, eid, part_id, dest):
         self.exported.append(part_id)
         Path(dest).write_bytes(b"solid")

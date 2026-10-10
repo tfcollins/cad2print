@@ -64,4 +64,17 @@ def thumb(request: Request, did: str, wvm: str, wvmid: str, eid: str):
         png = request.app.state.onshape.thumbnail(did, wvm, wvmid, eid)
     except OnshapeError:
         return Response(status_code=404)
+    return _png(png)
+
+
+@router.get("/thumb/d/{did}/w/{wid}")
+def document_thumb(request: Request, did: str, wid: str):
+    try:
+        png = request.app.state.onshape.document_thumbnail(did, wid)
+    except OnshapeError:
+        return Response(status_code=404)
+    return _png(png)
+
+
+def _png(png: bytes) -> Response:
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "private, max-age=600"})
