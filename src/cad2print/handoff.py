@@ -11,7 +11,7 @@ import shutil
 from pathlib import Path
 
 SUFFIX = ".gcode.3mf"
-_UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
+_UNSAFE = re.compile(r"[^A-Za-z0-9._+-]+")
 
 
 def safe_name(name: str) -> str:
