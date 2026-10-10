@@ -109,7 +109,8 @@ class JobRunner:
         try:
             for i, part in enumerate(job.spec.parts):
                 dest = work / f"{i:02d}_{handoff.safe_name(part.name)}.stl"
-                stls.append(self.onshape.export_stl(part.did, part.wvm, part.wvmid, part.eid, part.part_id, dest))
+                stl = self.onshape.export_stl(part.did, part.wvm, part.wvmid, part.eid, part.part_id, dest)
+                stls.extend([stl] * max(1, part.qty))
         except OnshapeError as e:
             self.db.finish(job.id, error=f"Onshape export failed for {part.name!r}: {e}",
                            duration_s=time.monotonic() - start)

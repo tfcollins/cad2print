@@ -38,6 +38,7 @@ class PartRef:
     eid: str
     part_id: str
     name: str
+    qty: int = 1
 
 
 @dataclass(frozen=True)

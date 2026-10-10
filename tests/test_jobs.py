@@ -136,3 +136,15 @@ def test_unknown_preset_fails_at_submit(env):
     r = _runner(env, FakeOnshape(), FakeSlicer())
     with pytest.raises(KeyError):
         r.submit(JobSpec(parts=[PART], preset="nope", overrides=CFG.defaults))
+
+
+def test_part_qty_exports_once_and_repeats_the_stl_for_the_slicer(env):
+    onshape, slicer = FakeOnshape(), FakeSlicer()
+    r = _runner(env, onshape, slicer)
+    three = PartRef(**{**PART.__dict__, "qty": 3})
+    job = r.submit(JobSpec(parts=[three], preset="p", overrides=CFG.defaults))
+    r.run_one(job.id)
+    assert onshape.calls == ["JHD"], "one download per distinct part"
+    stl_args = [a for a in slicer.commands[0] if a.endswith(".stl")]
+    assert len(stl_args) == 3 and len(set(stl_args)) == 1
+    assert env["db"].get(job.id).handoff_name == "Plate.gcode.3mf"

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Print settings</h1>
+<div class="summary">
+  Printing
+  <ul>
+    {% for c in chosen %}<li>{{ c.name }}{% if c.qty > 1 %} &times;{{ c.qty }}{% endif %}</li>{% endfor %}
+  </ul>
+</div>
+<form class="setup" action="/jobs" method="post">
+  {% for k, v in ref.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  {% for c in chosen %}
+  <input type="hidden" name="part" value="{{ c.id }}">
+  <input type="hidden" name="name_{{ c.id }}" value="{{ c.name }}">
+  <input type="hidden" name="qty_{{ c.id }}" value="{{ c.qty }}">
+  {% endfor %}
+  <label>
+    <span>Material and quality</span>
+    <select name="preset">
+      {% for key, p in presets.presets.items() %}<option value="{{ key }}">{{ p.label }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>
+    <span>Infill, percent</span>
+    <input type="number" name="infill" value="{{ defaults.infill }}" min="0" max="100" inputmode="numeric">
+  </label>
+  <label>
+    <span>Copies of the whole plate</span>
+    <input type="number" name="copies" value="{{ defaults.copies }}" min="1" max="50" inputmode="numeric">
+  </label>
+  <div class="checks">
+    <label><input type="checkbox" name="supports" {% if defaults.supports %}checked{% endif %}> Add supports</label>
+  </div>
+  <div class="actions">
+    <button type="submit">Slice and send to Bambu Connect</button>
+  </div>
+</form>
+{% endblock %}
