@@ -1,0 +1,26 @@
+# Slicing presets for the Bambu Lab H2S. Paths are relative to profiles_dir, which points at
+# OrcaSlicer's bundled system profiles (they use `inherits`; the CLI resolves that itself —
+# see docs/spike-cli.md). Add a preset = add a key here; the UI lists them in this order.
+profiles_dir: /opt/orcaslicer/resources/profiles/BBL
+
+presets:
+  h2s-pla-020:
+    label: "H2S · PLA Basic · 0.20 mm Standard"
+    machine: "machine/Bambu Lab H2S 0.4 nozzle.json"
+    process: "process/0.20mm Standard @BBL H2S.json"
+    filament: "filament/Bambu PLA Basic @BBL H2S.json"
+  h2s-pla-012:
+    label: "H2S · PLA Basic · 0.12 mm High Quality"
+    machine: "machine/Bambu Lab H2S 0.4 nozzle.json"
+    process: "process/0.12mm High Quality @BBL H2S.json"
+    filament: "filament/Bambu PLA Basic @BBL H2S.json"
+  h2s-petg-020:
+    label: "H2S · PETG HF · 0.20 mm Standard"
+    machine: "machine/Bambu Lab H2S 0.4 nozzle.json"
+    process: "process/0.20mm Standard @BBL H2S.json"
+    filament: "filament/Bambu PETG HF @BBL H2S.json"
+
+defaults:
+  infill: 15      # percent
+  supports: false
+  copies: 1
