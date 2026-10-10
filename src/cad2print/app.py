@@ -62,6 +62,11 @@ def create_app(settings: Settings | None = None, *, onshape=None, presets: Prese
     return app
 
 
+def factory() -> FastAPI:
+    """Entry point for `uvicorn cad2print.app:factory --factory`."""
+    return create_app()
+
+
 def render(request: Request, name: str, **ctx):
     """Render a template with the app-wide context every page needs."""
     templates: Jinja2Templates = request.app.state.templates

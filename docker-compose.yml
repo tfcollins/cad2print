@@ -1,0 +1,13 @@
+# Local run: `cp .env.example .env`, fill the Onshape keys, `docker compose up --build`.
+# Sliced plates land in ./data/handoff (in production that is the prints share, see README).
+services:
+  cad2print:
+    build: .
+    image: cad2print:dev
+    container_name: cad2print
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
