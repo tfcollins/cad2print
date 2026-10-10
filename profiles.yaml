@@ -5,17 +5,17 @@ profiles_dir: /opt/orcaslicer/resources/profiles/BBL
 
 presets:
   h2s-pla-020:
-    label: "H2S · PLA Basic · 0.20 mm Standard"
+    label: "PLA Basic, 0.20 mm Standard (H2S, 0.4 nozzle)"
     machine: "machine/Bambu Lab H2S 0.4 nozzle.json"
     process: "process/0.20mm Standard @BBL H2S.json"
     filament: "filament/Bambu PLA Basic @BBL H2S.json"
   h2s-pla-012:
-    label: "H2S · PLA Basic · 0.12 mm High Quality"
+    label: "PLA Basic, 0.12 mm High Quality (H2S, 0.4 nozzle)"
     machine: "machine/Bambu Lab H2S 0.4 nozzle.json"
     process: "process/0.12mm High Quality @BBL H2S.json"
     filament: "filament/Bambu PLA Basic @BBL H2S.json"
   h2s-petg-020:
-    label: "H2S · PETG HF · 0.20 mm Standard"
+    label: "PETG HF, 0.20 mm Standard (H2S, 0.4 nozzle)"
     machine: "machine/Bambu Lab H2S 0.4 nozzle.json"
     process: "process/0.20mm Standard @BBL H2S.json"
     filament: "filament/Bambu PETG HF @BBL H2S.json"
