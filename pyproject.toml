@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cad2print"
-version = "0.1.0"
+version = "0.1.1"
 description = "Pull parts from Onshape, slice with OrcaSlicer, hand off to Bambu Connect"
 requires-python = ">=3.11"
 dependencies = [
@@ -21,6 +21,9 @@ dev = ["pytest>=8.0", "respx>=0.21", "ruff>=0.5", "httpx2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+cad2print = ["templates/*.html", "static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
