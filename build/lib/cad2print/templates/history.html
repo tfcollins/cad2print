@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Jobs – cad2print{% endblock %}
+{% block content %}
+<h1>Jobs</h1>
+{% if jobs %}{% include "_job_list.html" %}{% else %}<p class="muted">No jobs yet.</p>{% endif %}
+{% endblock %}

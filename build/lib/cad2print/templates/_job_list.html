@@ -1,0 +1,11 @@
+<ul class="jobs">
+  {% for j in (jobs if jobs is defined else recent) %}
+  <li>
+    <a href="/jobs/{{ j.id }}"><strong>{{ j.title }}</strong></a>
+    <span class="status status-{{ j.status }}">{{ j.status }}</span>
+    <span class="muted">{{ presets.presets[j.spec.preset].label if j.spec.preset in presets.presets else j.spec.preset }}
+      {% if j.spec.overrides.copies > 1 %}&times;{{ j.spec.overrides.copies }}{% endif %}</span>
+    <time class="muted" datetime="{{ j.created }}">{{ j.created[:16].replace('T', ' ') }}</time>
+  </li>
+  {% endfor %}
+</ul>

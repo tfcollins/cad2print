@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_wheel_contains_templates_and_static(tmp_path):
-    subprocess.run([sys.executable, "-m", "pip", "wheel", str(ROOT), "--no-deps", "--no-build-isolation",
+    subprocess.run([sys.executable, "-m", "pip", "wheel", str(ROOT), "--no-deps",
                     "-q", "-w", str(tmp_path)], check=True, capture_output=True)
     wheel = next(tmp_path.glob("cad2print-*.whl"))
     names = zipfile.ZipFile(wheel).namelist()

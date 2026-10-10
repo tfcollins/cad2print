@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Which revision?</h1>
+<ul class="list">
+  {% if wid %}
+  <li><a href="/d/{{ did }}/w/{{ wid }}/elements"><strong>Main workspace</strong></a> <span class="muted">latest edits</span></li>
+  {% endif %}
+  {% for v in versions %}
+  <li><a href="/d/{{ did }}/v/{{ v.id }}/elements">{{ v.name }}</a> <span class="muted">version</span></li>
+  {% endfor %}
+</ul>
+{% endblock %}
