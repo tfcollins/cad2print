@@ -8,7 +8,7 @@ FORM = {"did": DID, "wvm": "w", "wvmid": WID, "eid": EID, "part": ["JHD", "JHE"]
 
 def test_setup_page_shows_chosen_parts_preset_and_overrides(client):
     html = client.post("/setup", data=FORM).text
-    assert "Plate" in html and "Lid" in html and "&times;2" in html or "×2" in html
+    assert "Plate" in html and "Lid" in html and ("&times;2" in html or "×2" in html)
     assert 'name="preset"' in html and "H2S PLA 0.20" in html
     assert 'name="infill"' in html and 'value="15"' in html
     assert 'name="supports"' in html and 'name="copies"' in html
@@ -55,10 +55,8 @@ def test_status_page_and_fragment_show_stages_and_handoff(client, app):
     assert 'hx-trigger' not in frag.text, "terminal state stops polling"
 
 
-def test_fragment_keeps_polling_while_running(client, app, monkeypatch):
-    import cad2print.jobs as jobs_mod
-    # Freeze the runner so the job stays queued.
-    monkeypatch.setattr(app.state.runner, "_q", type("Q", (), {"put": lambda self, x: None, "empty": lambda self: True})())
+def test_fragment_keeps_polling_while_running(client, app):
+    app.state.runner.stop()  # no worker: the job stays queued
     job_id = _create(client).headers["location"].rsplit("/", 1)[1]
     frag = client.get(f"/jobs/{job_id}/fragment").text
     assert 'hx-trigger="every 2s"' in frag and "queued" in frag.lower()
@@ -89,3 +87,13 @@ def test_history_lists_jobs_newest_first_and_rerun_clones(client, app):
 
 def test_unknown_job_is_404(client):
     assert client.get("/jobs/doesnotexist").status_code == 404
+
+
+def test_create_job_with_unknown_preset_is_rejected(client):
+    r = _create(client, preset="nope")
+    assert r.status_code == 400 and "nope" in r.text
+
+
+def test_hostile_part_name_is_escaped_in_setup_page(client):
+    html = client.post("/setup", data={**FORM, "name_JHD": "<script>alert(1)</script>"}).text
+    assert "<script>alert(1)</script>" not in html and "&lt;script&gt;" in html

@@ -10,6 +10,7 @@ def test_publish_moves_file_atomically_into_handoff_dir(tmp_path):
     src.parent.mkdir()
     src.write_bytes(b"3MF")
     handoff = tmp_path / "prints"
+    handoff.mkdir()
 
     out = publish(src, "Rack Mount", handoff)
 
@@ -32,8 +33,11 @@ def test_publish_suffixes_on_name_collision(tmp_path):
     assert (handoff / "cube.gcode.3mf").read_bytes() == b"old"
 
 
-def test_publish_creates_handoff_dir_if_missing(tmp_path):
+def test_publish_refuses_to_invent_a_missing_handoff_dir(tmp_path):
+    """A missing dir means the prints share is not mounted; silently creating it would strand plates."""
+    import pytest
     src = tmp_path / "a.gcode.3mf"
     src.write_bytes(b"x")
-    out = publish(src, "a", tmp_path / "deep" / "prints")
-    assert out.is_file()
+    with pytest.raises(FileNotFoundError):
+        publish(src, "a", tmp_path / "deep" / "prints")
+    assert not (tmp_path / "deep").exists()

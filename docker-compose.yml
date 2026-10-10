@@ -1,5 +1,5 @@
 # Local run: `cp .env.example .env`, fill the Onshape keys, `docker compose up --build`.
-# Sliced plates land in ./data/handoff (in production that is the prints share, see README).
+# `mkdir -p data/handoff` first (the app refuses to start without it). Sliced plates land in ./data/handoff (in production that is the prints share, see README).
 services:
   cad2print:
     build: .

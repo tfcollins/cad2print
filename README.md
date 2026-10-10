@@ -16,7 +16,8 @@ python -m venv .venv && . .venv/bin/activate
 pip install -e '.[dev]'
 cp .env.example .env            # add your Onshape API keys
 pytest                          # fast suite
-uvicorn cad2print.app:factory --factory --reload --port 8080
+mkdir -p data/handoff
+uvicorn cad2print.app:factory --factory --env-file .env --reload --port 8080
 ```
 
 Without an `orca-slicer` binary the app still browses Onshape; slicing jobs fail at the

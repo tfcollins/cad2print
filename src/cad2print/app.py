@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -35,6 +35,10 @@ def create_app(settings: Settings | None = None, *, onshape=None, presets: Prese
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        if not settings.handoff_dir.is_dir():
+            raise RuntimeError(f"handoff dir {settings.handoff_dir} does not exist — is the prints share mounted?")
+        if not settings.onshape_access_key:
+            logging.getLogger(__name__).warning("ONSHAPE_ACCESS_KEY is empty; Onshape calls will fail")
         runner.start()
         try:
             yield
@@ -52,7 +56,10 @@ def create_app(settings: Settings | None = None, *, onshape=None, presets: Prese
     app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
 
     @app.get("/healthz")
-    def healthz() -> dict:
+    def healthz(response: Response) -> dict:
+        if not runner.alive:
+            response.status_code = 503
+            return {"ok": False, "worker": "dead"}
         return {"ok": True}
 
     from .routes import browse, jobs  # noqa: E402  (import after state exists)

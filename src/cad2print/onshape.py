@@ -36,11 +36,14 @@ class OnshapeClient:
 
     def _get(self, path: str, params: dict | None = None, accept: str | None = None) -> httpx.Response:
         headers = {"Accept": accept} if accept else None
-        resp = self._http.get(f"{self._base}/api/v9{path}", params=params, headers=headers)
-        if resp.is_redirect:
-            # The STL export 307s to another Onshape host; httpx drops auth across hosts, so
-            # follow the hop by hand with the same credentials.
-            resp = self._http.get(resp.headers["location"], auth=self._auth, headers=headers)
+        try:
+            resp = self._http.get(f"{self._base}/api/v9{path}", params=params, headers=headers)
+            if resp.is_redirect:
+                # The STL export 307s to another Onshape host; httpx drops auth across hosts, so
+                # follow the hop by hand with the same credentials.
+                resp = self._http.get(resp.headers["location"], auth=self._auth, headers=headers)
+        except httpx.HTTPError as e:
+            raise OnshapeError(0, f"{type(e).__name__}: {e}") from e
         if resp.status_code >= 400:
             raise OnshapeError(resp.status_code, _snippet(resp))
         return resp

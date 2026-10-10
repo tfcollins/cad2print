@@ -6,7 +6,8 @@ FROM lscr.io/linuxserver/orcaslicer:v2.4.2-ls42
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     PROFILES_FILE=/app/profiles.yaml \
     HANDOFF_DIR=/data/handoff WORK_DIR=/data/work DB_PATH=/data/db/cad2print.sqlite \
-    ORCA_BIN=/opt/orcaslicer/bin/orca-slicer
+    ORCA_BIN=/opt/orcaslicer/bin/orca-slicer \
+    HOME=/data/work XDG_RUNTIME_DIR=/tmp
 
 WORKDIR /app
 COPY pyproject.toml README.md profiles.yaml ./

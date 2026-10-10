@@ -67,8 +67,17 @@ class JobRunner:
 
     def start(self) -> None:
         if self._thread is None:
+            # Jobs left queued/running by a previous process would poll forever: the queue is
+            # in-memory, so they cannot resume. Fail them visibly instead.
+            for job in self.db.list_recent(500):
+                if job.status in {"queued", "running"}:
+                    self.db.finish(job.id, error="interrupted by a cad2print restart; run it again")
             self._thread = threading.Thread(target=self._loop, name="cad2print-worker", daemon=True)
             self._thread.start()
+
+    @property
+    def alive(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
 
     def stop(self, timeout: float = 5) -> None:
         if self._thread is not None:
@@ -88,9 +97,12 @@ class JobRunner:
                 break
             try:
                 self.run_one(job_id)
-            except Exception:  # pragma: no cover - last-resort guard so the worker never dies
+            except Exception:
                 log.exception("job %s crashed", job_id)
-                self.db.finish(job_id, error="internal error; see server log")
+                try:
+                    self.db.finish(job_id, error="internal error; see server log")
+                except Exception:
+                    log.exception("could not record the failure of job %s", job_id)
             finally:
                 if self._q.empty():
                     self._idle.set()
@@ -130,7 +142,7 @@ class JobRunner:
         self.db.set_stage(job.id, "handing_off")
         try:
             published = handoff.publish(result.out_path, job.title, self.handoff_dir)
-        except OSError as e:
+        except OSError as e:  # includes FileNotFoundError for an unmounted handoff dir
             self.db.finish(job.id, error=f"could not write to handoff dir: {e}", log_tail=result.log_tail,
                            duration_s=time.monotonic() - start)
             return

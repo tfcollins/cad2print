@@ -22,7 +22,9 @@ def safe_name(name: str) -> str:
 
 def publish(src: Path, display_name: str, handoff_dir: Path) -> Path:
     handoff_dir = Path(handoff_dir)
-    handoff_dir.mkdir(parents=True, exist_ok=True)
+    if not handoff_dir.is_dir():
+        # Creating it would hide an unmounted prints share: the plate would never reach bambu-win.
+        raise FileNotFoundError(f"handoff dir is not mounted: {handoff_dir}")
     base = safe_name(display_name)
     dest = handoff_dir / f"{base}{SUFFIX}"
     n = 2

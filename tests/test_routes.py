@@ -4,8 +4,8 @@ from cad2print.app import create_app
 from tests.conftest import DID, EID, WID
 
 
-def test_healthz_reports_ok(app):
-    assert TestClient(app).get("/healthz").json() == {"ok": True}
+def test_healthz_reports_ok(client):
+    assert client.get("/healthz").json() == {"ok": True}
 
 
 def test_index_has_search_and_paste_forms(client):
@@ -65,3 +65,35 @@ def test_document_thumbnail_proxy_returns_png(client):
     r = client.get(f"/thumb/d/{DID}/w/{WID}")
     assert r.status_code == 200 and r.headers["content-type"].startswith("image/png")
     assert r.content == b"\x89PNGdoc"
+
+
+def test_onshape_outage_renders_502_not_a_traceback(client, fake_onshape):
+    from cad2print.onshape import OnshapeError
+
+    def down(*a, **k):
+        raise OnshapeError(0, "ConnectError: no route to host")
+
+    fake_onshape.search_documents = down
+    fake_onshape.versions = down
+    fake_onshape.part_studios = down
+    for url in ("/documents?q=x", f"/d/{DID}?wid={WID}", f"/d/{DID}/w/{WID}/elements"):
+        r = client.get(url)
+        assert r.status_code == 502 and "no route to host" in r.text, url
+
+
+def test_healthz_is_503_when_the_worker_is_dead(app):
+    with TestClient(app) as c:
+        assert c.get("/healthz").status_code == 200
+        app.state.runner.stop()
+        assert c.get("/healthz").status_code == 503
+
+
+def test_app_refuses_to_start_without_the_handoff_dir(tmp_path, presets, fake_onshape):
+    import pytest
+    from cad2print.config import Settings
+    settings = Settings(handoff_dir=tmp_path / "not-mounted", work_dir=tmp_path / "work",
+                        db_path=tmp_path / "db.sqlite", orca_bin="orca")
+    app = create_app(settings, onshape=fake_onshape, presets=presets)
+    with pytest.raises(RuntimeError, match="handoff"):
+        with TestClient(app):
+            pass

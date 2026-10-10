@@ -28,13 +28,19 @@ def documents(request: Request, q: str = ""):
 
 @router.get("/d/{did}", response_class=HTMLResponse)
 def document(request: Request, did: str, wid: str = ""):
-    versions = request.app.state.onshape.versions(did)
+    try:
+        versions = request.app.state.onshape.versions(did)
+    except OnshapeError as e:
+        return render(request, "error.html", message=str(e), status_code=502)
     return render(request, "document.html", did=did, wid=wid, versions=versions)
 
 
 @router.get("/d/{did}/{wvm}/{wvmid}/elements", response_class=HTMLResponse)
 def elements(request: Request, did: str, wvm: str, wvmid: str):
-    studios = request.app.state.onshape.part_studios(did, wvm, wvmid)
+    try:
+        studios = request.app.state.onshape.part_studios(did, wvm, wvmid)
+    except OnshapeError as e:
+        return render(request, "error.html", message=str(e), status_code=502)
     return render(request, "elements.html", did=did, wvm=wvm, wvmid=wvmid, studios=studios)
 
 

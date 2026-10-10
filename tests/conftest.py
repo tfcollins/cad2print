@@ -59,6 +59,7 @@ def fake_onshape():
 
 @pytest.fixture
 def app(tmp_path, presets, fake_onshape):
+    (tmp_path / "prints").mkdir()
     settings = Settings(handoff_dir=tmp_path / "prints", work_dir=tmp_path / "work",
                         db_path=tmp_path / "db.sqlite", orca_bin="orca")
     return create_app(settings, onshape=fake_onshape, presets=presets, slice_fn=fake_slice)

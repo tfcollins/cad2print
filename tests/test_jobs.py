@@ -44,6 +44,7 @@ class FakeSlicer:
 @pytest.fixture
 def env(tmp_path):
     db = Database(tmp_path / "db.sqlite")
+    (tmp_path / "prints").mkdir()
     return dict(db=db, work=tmp_path / "work", handoff=tmp_path / "prints")
 
 
@@ -148,3 +149,54 @@ def test_part_qty_exports_once_and_repeats_the_stl_for_the_slicer(env):
     stl_args = [a for a in slicer.commands[0] if a.endswith(".stl")]
     assert len(stl_args) == 3 and len(set(stl_args)) == 1
     assert env["db"].get(job.id).handoff_name == "Plate.gcode.3mf"
+
+
+def test_start_marks_jobs_interrupted_by_a_previous_process_as_failed(env):
+    db = env["db"]
+    stale_running = db.create(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults))
+    db.set_stage(stale_running.id, "slicing")
+    stale_queued = db.create(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults))
+    r = _runner(env, FakeOnshape(), FakeSlicer())
+    r.start()
+    try:
+        for jid in (stale_running.id, stale_queued.id):
+            j = db.get(jid)
+            assert j.status == "failed" and "restart" in j.error
+    finally:
+        r.stop()
+
+
+def test_worker_survives_a_crashing_job_and_a_failing_finish(env, monkeypatch):
+    r = _runner(env, FakeOnshape(), FakeSlicer())
+    monkeypatch.setattr(r, "run_one", lambda job_id: 1 / 0)
+    calls = {"n": 0}
+    real_finish = env["db"].finish
+
+    def flaky_finish(job_id, **kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("db hiccup")
+        return real_finish(job_id, **kw)
+
+    monkeypatch.setattr(env["db"], "finish", flaky_finish)
+    r.start()
+    try:
+        a = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults))
+        b = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults))
+        assert r.wait_idle(5)
+        assert r.alive, "worker thread must outlive job crashes"
+        assert env["db"].get(b.id).status == "failed"
+    finally:
+        r.stop()
+
+
+def test_transport_error_during_export_fails_job_with_a_readable_message(env):
+    class Flaky:
+        def export_stl(self, *a, **k):
+            from cad2print.onshape import OnshapeError
+            raise OnshapeError(0, "ConnectError: all connection attempts failed")
+
+    r = _runner(env, Flaky(), FakeSlicer())
+    job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults))
+    r.run_one(job.id)
+    assert "connection attempts failed" in env["db"].get(job.id).error

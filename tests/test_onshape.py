@@ -124,7 +124,7 @@ def test_http_error_surfaces_as_onshape_error_with_status(client):
 
 
 @respx.mock
-def test_export_stl_without_redirect_streams_body(client, tmp_path):
+def test_export_stl_without_redirect_writes_body(client, tmp_path):
     respx.get(
         f"{BASE}/api/v9/parts/d/{DID}/w/{WID}/e/{EID}/partid/{PID}/stl",
         params={"mode": "binary", "units": "millimeter"},
@@ -140,3 +140,11 @@ def test_document_thumbnail_uses_workspace_level_endpoint(client):
         return_value=httpx.Response(200, content=b"\x89PNGdoc", headers={"content-type": "image/png"})
     )
     assert client.document_thumbnail(DID, WID) == b"\x89PNGdoc"
+
+
+@respx.mock
+def test_transport_errors_surface_as_onshape_error(client):
+    respx.get(f"{BASE}/api/v9/documents/d/{DID}/versions").mock(side_effect=httpx.ConnectError("boom"))
+    with pytest.raises(OnshapeError) as ei:
+        client.versions(DID)
+    assert ei.value.status == 0 and "boom" in str(ei.value)
