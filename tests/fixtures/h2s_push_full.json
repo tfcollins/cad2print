@@ -1,0 +1,35 @@
+{
+ "print": {
+  "bed_temper": 27.0,
+  "command": "push_status",
+  "gcode_file": "/data/Metadata/plate_2.gcode",
+  "gcode_state": "FINISH",
+  "hms": [
+   {
+    "attr": 83952640,
+    "code": 196610
+   },
+   {
+    "attr": 83952640,
+    "code": 196612
+   }
+  ],
+  "job_id": "1326833754",
+  "layer_num": 40,
+  "mc_percent": 100,
+  "mc_print_stage": "1",
+  "mc_print_sub_stage": 0,
+  "mc_remaining_time": 0,
+  "msg": 0,
+  "nozzle_temper": 29.0,
+  "online": {
+   "ahb": true,
+   "version": 5
+  },
+  "print_error": 0,
+  "print_type": "cloud",
+  "subtask_name": "IKEA BISSA Shoe Rack Divider",
+  "total_layer_num": 40,
+  "wifi_signal": "-71dBm"
+ }
+}

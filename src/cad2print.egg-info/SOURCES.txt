@@ -8,6 +8,7 @@ src/cad2print/handoff.py
 src/cad2print/jobs.py
 src/cad2print/onshape.py
 src/cad2print/presets.py
+src/cad2print/printer.py
 src/cad2print/slicer.py
 src/cad2print/urlparse.py
 src/cad2print.egg-info/PKG-INFO
@@ -37,6 +38,7 @@ tests/test_jobs.py
 tests/test_onshape.py
 tests/test_packaging.py
 tests/test_presets.py
+tests/test_printer.py
 tests/test_routes.py
 tests/test_slicer_cmd.py
 tests/test_urlparse.py
