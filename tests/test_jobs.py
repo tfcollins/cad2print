@@ -200,3 +200,47 @@ def test_transport_error_during_export_fails_job_with_a_readable_message(env):
     job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults))
     r.run_one(job.id)
     assert "connection attempts failed" in env["db"].get(job.id).error
+
+
+# --- auto-start (A2): spec flag, settings, stages -------------------------------------------
+
+def test_job_spec_carries_auto_start_and_db_round_trips_it(env):
+    db = env["db"]
+    a = db.create(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults, auto_start=True))
+    m = db.create(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults, auto_start=False))
+    assert db.get(a.id).spec.auto_start is True and db.get(m.id).spec.auto_start is False
+    assert JobSpec(parts=[PART], preset="p", overrides=CFG.defaults).auto_start is True, "default on"
+
+
+def test_bed_cleared_flag_persists(env):
+    db = env["db"]
+    assert db.get_flag("bed_cleared") is False
+    db.set_flag("bed_cleared", True)
+    assert db.get_flag("bed_cleared") is True
+    db.set_flag("bed_cleared", False)
+    assert db.get_flag("bed_cleared") is False
+
+
+def test_waiting_jobs_are_listed_oldest_first(env):
+    db = env["db"]
+    j1 = db.create(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults))
+    j2 = db.create(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults))
+    db.set_stage(j1.id, "waiting_for_printer"); db.set_stage(j2.id, "waiting_for_printer")
+    assert [j.id for j in db.list_by_stage("waiting_for_printer")] == [j1.id, j2.id]
+
+
+def test_existing_database_without_the_column_is_migrated(tmp_path):
+    import sqlite3
+    path = tmp_path / "old.sqlite"
+    con = sqlite3.connect(path)
+    con.executescript("""
+        CREATE TABLE jobs (id TEXT PRIMARY KEY, created TEXT NOT NULL, updated TEXT NOT NULL,
+          status TEXT NOT NULL, stage TEXT NOT NULL, stages_seen TEXT NOT NULL DEFAULT '[]',
+          preset TEXT NOT NULL, overrides TEXT NOT NULL, parts TEXT NOT NULL,
+          handoff_name TEXT, error TEXT, log_tail TEXT, duration_s REAL);
+        INSERT INTO jobs VALUES ('old1','2026-10-10T00:00:00+00:00','2026-10-10T00:00:00+00:00','done','done','[]','p',
+          '{"infill":15,"supports":false,"copies":1}', '[]', 'x.gcode.3mf', NULL, NULL, 1.0);
+    """)
+    con.commit(); con.close()
+    db = Database(path)
+    assert db.get("old1").spec.auto_start is True

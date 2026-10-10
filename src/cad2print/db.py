@@ -25,9 +25,19 @@ CREATE TABLE IF NOT EXISTS jobs (
     handoff_name  TEXT,
     error         TEXT,
     log_tail      TEXT,
-    duration_s    REAL
+    duration_s    REAL,
+    auto_start    INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS flags (
+    name   TEXT PRIMARY KEY,
+    value  INTEGER NOT NULL
 );
 """
+
+_MIGRATIONS = [
+    # (column, DDL) — applied when the column is missing from an older database
+    ("auto_start", "ALTER TABLE jobs ADD COLUMN auto_start INTEGER NOT NULL DEFAULT 1"),
+]
 
 
 @dataclass(frozen=True)
@@ -46,6 +56,7 @@ class JobSpec:
     parts: list[PartRef]
     preset: str
     overrides: Overrides
+    auto_start: bool = True
 
 
 @dataclass
@@ -87,16 +98,22 @@ class Database:
         self._conn.row_factory = sqlite3.Row
         with self._lock:
             self._conn.executescript(_SCHEMA)
+            cols = {r[1] for r in self._conn.execute("PRAGMA table_info(jobs)")}
+            for col, ddl in _MIGRATIONS:
+                if col not in cols:
+                    self._conn.execute(ddl)
+            self._conn.commit()
 
     def create(self, spec: JobSpec) -> Job:
         job = Job(id=uuid.uuid4().hex[:12], created=_now(), updated=_now(),
                   status="queued", stage="queued", spec=spec)
         with self._lock, self._conn:
             self._conn.execute(
-                "INSERT INTO jobs (id, created, updated, status, stage, stages_seen, preset, overrides, parts)"
-                " VALUES (?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO jobs (id, created, updated, status, stage, stages_seen, preset, overrides, parts,"
+                " auto_start) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (job.id, job.created, job.updated, job.status, job.stage, "[]", spec.preset,
-                 json.dumps(asdict(spec.overrides)), json.dumps([asdict(p) for p in spec.parts])),
+                 json.dumps(asdict(spec.overrides)), json.dumps([asdict(p) for p in spec.parts]),
+                 1 if spec.auto_start else 0),
             )
         return job
 
@@ -111,6 +128,26 @@ class Database:
                 "SELECT * FROM jobs ORDER BY created DESC, rowid DESC LIMIT ?", (limit,)
             ).fetchall()
         return [_row_to_job(r) for r in rows]
+
+    def list_by_stage(self, stage: str) -> list[Job]:
+        """Jobs currently in `stage`, oldest first (the dispatch queue order)."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM jobs WHERE stage = ? AND status NOT IN ('done','failed')"
+                " ORDER BY created ASC, rowid ASC", (stage,)
+            ).fetchall()
+        return [_row_to_job(r) for r in rows]
+
+    def get_flag(self, name: str) -> bool:
+        with self._lock:
+            row = self._conn.execute("SELECT value FROM flags WHERE name = ?", (name,)).fetchone()
+        return bool(row[0]) if row else False
+
+    def set_flag(self, name: str, value: bool) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("INSERT INTO flags (name, value) VALUES (?, ?)"
+                               " ON CONFLICT(name) DO UPDATE SET value = excluded.value",
+                               (name, 1 if value else 0))
 
     def set_stage(self, job_id: str, stage: str, status: str = "running") -> None:
         with self._lock, self._conn:
@@ -148,6 +185,7 @@ def _row_to_job(row: sqlite3.Row) -> Job:
         parts=[PartRef(**p) for p in json.loads(row["parts"])],
         preset=row["preset"],
         overrides=Overrides(**json.loads(row["overrides"])),
+        auto_start=bool(row["auto_start"]) if "auto_start" in row.keys() else True,
     )
     return Job(
         id=row["id"], created=row["created"], updated=row["updated"], status=row["status"],
