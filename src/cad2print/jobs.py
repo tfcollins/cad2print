@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from typing import Callable, Protocol
 
-from . import handoff, slicer
+from . import handoff, plate3mf, slicer
 from .db import Database, Job, JobSpec, PartRef  # re-exported for callers
 from .onshape import OnshapeError
 from .presets import PresetConfig
@@ -165,6 +165,15 @@ class JobRunner:
                            duration_s=time.monotonic() - start)
             return
 
+        # Bambu Connect needs a plate thumbnail + printer model id that the CLI cannot produce.
+        try:
+            plate3mf.finalize_plate(result.out_path, thumbnail_png=self._thumbnail_for(job),
+                                    printer_model_id=plate3mf.printer_model_id_for(preset.machine))
+        except (OSError, ValueError) as e:
+            self.db.finish(job.id, error=f"could not finalize the sliced plate: {e}", log_tail=result.log_tail,
+                           duration_s=time.monotonic() - start)
+            return
+
         if job.spec.auto_start and self.printer.enabled:
             # Park until the printer is free and the bed has been confirmed clear (see tick()).
             self.db.set_stage(job.id, "waiting_for_printer")
@@ -182,6 +191,18 @@ class JobRunner:
         self.db.finish(job.id, handoff_name=published.name, log_tail=result.log_tail,
                        duration_s=time.monotonic() - start)
         shutil.rmtree(work, ignore_errors=True)
+
+    def _thumbnail_for(self, job: Job) -> bytes | None:
+        """Onshape's preview of the first part's studio, or None (placeholder) if unavailable."""
+        part = job.spec.parts[0] if job.spec.parts else None
+        getter = getattr(self.onshape, "thumbnail", None)
+        if part is None or getter is None:
+            return None
+        try:
+            return getter(part.did, part.wvm, part.wvmid, part.eid)
+        except Exception as e:  # noqa: BLE001 - any failure just means a placeholder thumbnail
+            log.warning("job %s: no Onshape thumbnail (%s)", job.id, e)
+            return None
 
     # -- auto-start dispatcher ---------------------------------------------------------------
 

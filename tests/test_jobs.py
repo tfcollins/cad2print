@@ -18,6 +18,11 @@ class FakeOnshape:
     def __init__(self, fail=False):
         self.fail = fail
         self.calls = []
+        self.thumb_calls = []
+
+    def thumbnail(self, did, wvm, wvmid, eid, size="300x170"):
+        self.thumb_calls.append(eid)
+        return b"\x89PNGonshape"
 
     def export_stl(self, did, wvm, wvmid, eid, part_id, dest):
         self.calls.append(part_id)
@@ -37,7 +42,8 @@ class FakeSlicer:
         self.commands.append(cmd)
         if not self.ok:
             return SliceResult(False, None, 3, 0.1, "boom", "orca-slicer exited with code 3")
-        Path(expected_output).write_bytes(b"3MF")
+        from tests.test_plate3mf import write_minimal_plate
+        write_minimal_plate(Path(expected_output))
         return SliceResult(True, Path(expected_output), 0, 0.1, "done")
 
 
@@ -369,3 +375,33 @@ def test_queue_position_and_gate_reason_are_exposed(env):
     b = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); r.run_one(b.id)
     assert r.queue_position(b.id) == 2
     assert "printing" in r.gate_reason()
+
+
+def test_published_plate_carries_the_onshape_thumbnail_and_model_id(env, tmp_path):
+    import zipfile
+    onshape = FakeOnshape()
+    r = _runner(env, onshape, FakeSlicer())
+    (tmp_path / "m.json").write_text('{"type":"machine","printer_model":"Bambu Lab H2S"}')
+    (tmp_path / "Bambu Lab H2S.json").write_text('{"type":"machine_model","model_id":"O1S"}')
+    r.presets = PresetConfig(presets={"p": Preset("p", "P", tmp_path / "m.json", Path("/pr.json"), Path("/f.json"))},
+                             defaults=CFG.defaults)
+    job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults))
+    r.run_one(job.id)
+    with zipfile.ZipFile(env["handoff"] / "Plate.gcode.3mf") as z:
+        assert z.read("Metadata/plate_1.png") == b"\x89PNGonshape"
+        assert 'value="O1S"' in z.read("Metadata/slice_info.config").decode()
+    assert onshape.thumb_calls == [PART.eid]
+
+
+def test_thumbnail_failure_falls_back_to_placeholder(env):
+    import zipfile
+    from cad2print.onshape import OnshapeError
+    from cad2print.plate3mf import PLACEHOLDER_PNG
+    onshape = FakeOnshape()
+    def boom(*a, **k): raise OnshapeError(500, "nope")
+    onshape.thumbnail = boom
+    r = _runner(env, onshape, FakeSlicer())
+    job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults))
+    r.run_one(job.id)
+    with zipfile.ZipFile(env["handoff"] / "Plate.gcode.3mf") as z:
+        assert z.read("Metadata/plate_1.png") == PLACEHOLDER_PNG
