@@ -71,7 +71,7 @@ def printer_model_id_for(machine_json: Path) -> str:
 
 
 def finalize_plate(path: Path, *, thumbnail_png: bytes | None, printer_model_id: str,
-                   plate_name: str = "") -> Path:
+                   plate_name: str = "", filament_colour: str = "") -> Path:
     path = Path(path)
     png = thumbnail_png or PLACEHOLDER_PNG
     with zipfile.ZipFile(path) as src:
@@ -97,6 +97,13 @@ def finalize_plate(path: Path, *, thumbnail_png: bytes | None, printer_model_id:
                     lambda _m: f'<metadata key="plater_name" value="{escape(plate_name, {chr(34): "&quot;"})}"/>',
                     ms, count=1)
         entries["Metadata/model_settings.config"] = ms.encode("utf-8")
+
+    if filament_colour and "Metadata/project_settings.config" in entries:
+        # Bambu Connect maps the plate's filament to an AMS slot by colour/type; match the chosen tray.
+        ps = json.loads(entries["Metadata/project_settings.config"].decode("utf-8"))
+        n = max(1, len(ps.get("filament_colour") or []))
+        ps["filament_colour"] = [filament_colour] * n
+        entries["Metadata/project_settings.config"] = json.dumps(ps, indent=4).encode("utf-8")
 
     if printer_model_id and "Metadata/slice_info.config" in entries:
         si = entries["Metadata/slice_info.config"].decode("utf-8")

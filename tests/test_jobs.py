@@ -423,3 +423,35 @@ def test_parked_and_starting_jobs_survive_a_restart(env):
         assert db.get(starting.id).status == "running"
     finally:
         r.stop()
+
+
+# --- filament slot -----------------------------------------------------------------------------
+
+def test_job_spec_slot_round_trips_and_defaults_to_none(env):
+    db = env["db"]
+    a = db.create(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults, slot="A3"))
+    b = db.create(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults))
+    assert db.get(a.id).spec.slot == "A3" and db.get(b.id).spec.slot is None
+
+
+def test_dispatch_writes_a_slot_sidecar_for_bambu_win(env):
+    printer = FakePrinter("IDLE")
+    r = _auto_runner(env, printer)
+    job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults, slot="A3")); r.run_one(job.id)
+    env["db"].set_flag("bed_cleared", True); r.dispatch_next()
+    assert (env["handoff"] / "auto" / "Plate.gcode.3mf.slot").read_text().strip() == "A3"
+    other = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); r.run_one(other.id)
+    assert not list((env["handoff"] / "auto").glob("*-2.gcode.3mf.slot")), "no sidecar without a slot"
+
+
+def test_plate_filament_colour_follows_the_chosen_tray(env):
+    import zipfile, json
+    from cad2print.printer import PrinterState, Tray
+    printer = FakePrinter("IDLE")
+    printer.state = PrinterState(online=True, updated_at=1000.0, gcode_state="IDLE",
+                                 trays=(Tray("A1", "PLA", "PLA Basic", "#000000", 95), Tray("A3", "PLA", "PLA Basic", "#00AE42", 16)))
+    r = _auto_runner(env, printer)
+    job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults, slot="A3", auto_start=False)); r.run_one(job.id)
+    with zipfile.ZipFile(env["handoff"] / "Plate.gcode.3mf") as z:
+        ps = json.loads(z.read("Metadata/project_settings.config"))
+    assert ps["filament_colour"] == ["#00AE42"]

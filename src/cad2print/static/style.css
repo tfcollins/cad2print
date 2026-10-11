@@ -105,3 +105,7 @@ pre.log { font-family: var(--mono); font-size: .8rem; line-height: 1.4; backgrou
 .pstate-busy { color: var(--act); }
 .pstate-off { color: var(--muted); }
 .bed.ok { color: var(--ok); }
+
+.swatch { display: inline-block; width: .8em; height: .8em; border-radius: 2px; border: 1px solid var(--rule); vertical-align: -1px; margin-right: .3em; }
+.ams { display: inline-flex; gap: .9rem; flex-wrap: wrap; font-size: .9rem; color: var(--muted); }
+.setup small { display: block; margin-top: .25rem; }

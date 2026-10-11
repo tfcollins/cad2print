@@ -5,6 +5,7 @@
   <span class="pstate pstate-{{ 'busy' if printer.busy else ('off' if not printer.live else 'ready') }}">H2S: {{ printer.label }}</span>
   {% if printer.busy and printer.task_name %}<span class="muted">{{ printer.task_name }}{% if printer.percent is not none %}, {{ printer.percent }}%{% endif %}{% if printer.remaining_min %}, {{ printer.remaining_min }} min left{% endif %}</span>{% endif %}
   {% if printer.waiting %}<span class="muted">{{ printer.waiting }} waiting</span>{% endif %}
+  {% if printer.trays %}<span class="ams">{% for t in printer.trays %}<span class="tray" title="{{ t.label }}"><span class="swatch" style="background:{{ t.color }}"></span>{{ t.label }}</span>{% endfor %}</span>{% endif %}
   {% if printer.bed_cleared %}
     <span class="bed ok">Bed cleared, next plate will start when the printer is free</span>
   {% else %}

@@ -167,3 +167,34 @@ def test_failed_job_in_waiting_stage_shows_the_error_not_holding(client, auto_ap
     app.state.db.finish(job_id, error="interrupted by a cad2print restart; run it again")
     frag = client.get(f"/jobs/{job_id}/fragment").text
     assert "interrupted" in frag and "Holding" not in frag
+
+
+def test_setup_lists_ams_slots_with_remaining_and_create_records_the_slot(client, auto_app, app):
+    from cad2print.printer import PrinterState, Tray
+    auto_app.state.runner.printer.state = PrinterState(
+        online=True, updated_at=10.0, gcode_state="IDLE",
+        trays=(Tray("A1", "PLA", "PLA Basic", "#000000", 95), Tray("A2", "", "", "", None),
+               Tray("A3", "PETG", "PETG HF", "#FF0000", 40)))
+    html = client.post("/setup", data=FORM).text
+    assert 'name="slot"' in html and "A1 PLA Basic 95%" in html and "A3 PETG HF 40%" in html
+    assert "Let Bambu Connect choose" in html
+    assert 'value="A2"' not in html, "empty slots are not offered"
+    job_id = _create(client, slot="A3").headers["location"].rsplit("/", 1)[1]
+    assert app.state.db.get(job_id).spec.slot == "A3"
+    assert "A3 PETG HF" in client.get(f"/jobs/{job_id}").text
+
+
+def test_setup_warns_when_slot_material_differs_from_preset(client, auto_app):
+    from cad2print.printer import PrinterState, Tray
+    auto_app.state.runner.printer.state = PrinterState(online=True, updated_at=10.0, gcode_state="IDLE",
+                                                       trays=(Tray("A3", "PETG", "PETG HF", "#FF0000", 40),))
+    html = client.post("/setup", data=FORM).text
+    assert 'data-material="PETG"' in html and 'data-preset-material="PLA"' in html
+
+
+def test_printer_strip_shows_ams_slots(client, auto_app):
+    from cad2print.printer import PrinterState, Tray
+    auto_app.state.runner.printer.state = PrinterState(online=True, updated_at=10.0, gcode_state="IDLE",
+                                                       trays=(Tray("A1", "PLA", "PLA Basic", "#000000", 95), Tray("A4", "PLA", "PLA Basic", "#00AE42", 16)))
+    html = client.get("/printer/strip").text
+    assert "A1 PLA Basic 95%" in html and "A4 PLA Basic 16%" in html and "#00AE42" in html

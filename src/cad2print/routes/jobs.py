@@ -1,6 +1,8 @@
 """Print setup → job creation → live status → history / re-run."""
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -38,6 +40,7 @@ def _printer_ctx(request: Request) -> dict:
         "bed_cleared": request.app.state.db.get_flag("bed_cleared"),
         "gate_reason": runner.gate_reason(),
         "waiting": len(request.app.state.db.list_by_stage("waiting_for_printer")),
+        "trays": [t for t in getattr(st, "trays", ()) if not t.empty],
     }
 
 
@@ -60,9 +63,11 @@ async def setup(request: Request):
     ref, chosen = await _selected_parts(request)
     if not chosen:
         return render(request, "error.html", message="Choose at least one part to print.", status_code=400)
+    runner = request.app.state.runner
     return render(request, "setup.html", ref=ref, chosen=chosen,
                   defaults=request.app.state.presets.defaults,
-                  printer_enabled=request.app.state.runner.printer.enabled)
+                  printer_enabled=runner.printer.enabled,
+                  trays=[t for t in getattr(runner.printer.state, "trays", ()) if not t.empty])
 
 
 @router.post("/jobs")
@@ -84,8 +89,11 @@ async def create_job(request: Request):
                      part_id=c["id"], name=c["name"], qty=c["qty"])
              for c in chosen]
     auto_start = str(form.get("auto_start", "")).lower() in {"1", "on", "true", "yes"}
+    slot = str(form.get("slot", "") or "").strip().upper() or None
+    if slot and not re.fullmatch(r"[A-D][1-4]", slot):
+        return render(request, "error.html", message=f"Unknown filament slot {slot!r}.", status_code=400)
     job = request.app.state.runner.submit(JobSpec(parts=parts, preset=preset, overrides=overrides,
-                                                  auto_start=auto_start))
+                                                  auto_start=auto_start, slot=slot))
     return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
 
@@ -100,7 +108,8 @@ def job_page(request: Request, job_id: str):
     if job is None:
         return render(request, "error.html", message="No such job.", status_code=404)
     return render(request, "job.html", job=job, stages=_stages_for(job), printer=_printer_ctx(request),
-                  queue_position=request.app.state.runner.queue_position(job.id))
+                  queue_position=request.app.state.runner.queue_position(job.id),
+                  tray=request.app.state.runner.tray(job.spec.slot))
 
 
 @router.get("/jobs/{job_id}/fragment", response_class=HTMLResponse)

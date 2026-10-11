@@ -20,6 +20,16 @@
       {% for key, p in presets.presets.items() %}<option value="{{ key }}">{{ p.label }}</option>{% endfor %}
     </select>
   </label>
+  {% if trays %}
+  <label>
+    <span>Filament (AMS slot)</span>
+    <select name="slot" data-preset-material="{{ presets.presets[presets.presets.keys()|list|first].material }}">
+      <option value="">Let Bambu Connect choose</option>
+      {% for t in trays %}<option value="{{ t.slot }}" data-material="{{ t.material }}">{{ t.label }}</option>{% endfor %}
+    </select>
+    <small class="muted">Remaining percent comes from the printer; a slot whose material differs from the preset is a mismatch.</small>
+  </label>
+  {% endif %}
   <label>
     <span>Infill, percent</span>
     <input type="number" name="infill" value="{{ defaults.infill }}" min="0" max="100" inputmode="numeric">

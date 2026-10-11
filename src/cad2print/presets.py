@@ -44,6 +44,13 @@ class Preset:
     filament: Path
     bed_type: str = ""  # OrcaSlicer curr_bed_type, e.g. "Textured PEI Plate"; must match the plate on the printer
 
+    @property
+    def material(self) -> str:
+        """Material family from the filament profile name ("Bambu PETG HF @BBL H2S" -> "PETG")."""
+        import re
+        m = re.search(r"\b(PLA|PETG|PET|ABS|ASA|TPU|PC|PA|PAHT|PPA|PPS|PVA|HIPS|PE|PP)\b", self.filament.stem.upper())
+        return m.group(1) if m else ""
+
 
 @dataclass(frozen=True)
 class PresetConfig:

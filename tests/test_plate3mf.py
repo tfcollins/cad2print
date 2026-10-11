@@ -49,6 +49,7 @@ def write_minimal_plate(p: Path) -> Path:
         z.writestr("Metadata/slice_info.config", SLICE_INFO)
         z.writestr("Metadata/plate_1.gcode", "; gcode\nG28\n")
         z.writestr("Metadata/plate_1.gcode.md5", "d41d8cd98f00b204e9800998ecf8427e")
+        z.writestr("Metadata/project_settings.config", '{"filament_colour": ["#F2754E"], "curr_bed_type": "Cool Plate"}')
     return p
 
 
@@ -131,3 +132,17 @@ def test_finalize_names_the_plate_so_the_printer_shows_it(tmp_path):
     finalize_plate(_make(q), thumbnail_png=None, printer_model_id="O1S", plate_name='A<"B"&C')
     with zipfile.ZipFile(q / "cube.gcode.3mf") as z:
         assert 'value="A&lt;&quot;B&quot;&amp;C"' in z.read("Metadata/model_settings.config").decode()
+
+
+def test_finalize_can_set_the_filament_colour(tmp_path):
+    import json
+    p = tmp_path / "c.gcode.3mf"
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("[Content_Types].xml", CONTENT_TYPES)
+        z.writestr("Metadata/model_settings.config", MODEL_SETTINGS)
+        z.writestr("Metadata/slice_info.config", SLICE_INFO)
+        z.writestr("Metadata/project_settings.config", json.dumps({"filament_colour": ["#F2754E"], "other": 1}))
+    finalize_plate(p, thumbnail_png=None, printer_model_id="O1S", filament_colour="#00AE42")
+    with zipfile.ZipFile(p) as z:
+        ps = json.loads(z.read("Metadata/project_settings.config"))
+    assert ps["filament_colour"] == ["#00AE42"] and ps["other"] == 1

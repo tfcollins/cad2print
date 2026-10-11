@@ -173,7 +173,7 @@ class JobRunner:
         try:
             plate3mf.finalize_plate(result.out_path, thumbnail_png=self._thumbnail_for(job),
                                     printer_model_id=plate3mf.printer_model_id_for(preset.machine),
-                                    plate_name=job.title)
+                                    plate_name=job.title, filament_colour=self._tray_colour(job.spec.slot))
         except (OSError, ValueError, zipfile.BadZipFile) as e:
             self.db.finish(job.id, error=f"could not finalize the sliced plate: {e}", log_tail=result.log_tail,
                            duration_s=time.monotonic() - start)
@@ -196,6 +196,16 @@ class JobRunner:
         self.db.finish(job.id, handoff_name=published.name, log_tail=result.log_tail,
                        duration_s=time.monotonic() - start)
         shutil.rmtree(work, ignore_errors=True)
+
+    def tray(self, slot: str | None):
+        for t in getattr(self.printer.state, "trays", ()):
+            if t.slot == slot:
+                return t
+        return None
+
+    def _tray_colour(self, slot: str | None) -> str:
+        t = self.tray(slot)
+        return t.color if t and t.color else ""
 
     def _thumbnail_for(self, job: Job) -> bytes | None:
         """Onshape's preview of the first part's studio, or None (placeholder) if unavailable."""
@@ -256,6 +266,9 @@ class JobRunner:
         except OSError as e:
             self.db.finish(job.id, error=f"could not write to the auto-start folder: {e}")
             return None
+        if job.spec.slot:
+            sidecar = published.with_name(published.name + ".slot")
+            sidecar.write_text(job.spec.slot + "\n")
         self.db.set_flag("bed_cleared", False)
         self.db.set_handoff_name(job.id, published.name)
         self.db.set_stage(job.id, "starting")

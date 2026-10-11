@@ -49,7 +49,7 @@ def fake_slice(cmd, expected_output, timeout_s, tail_lines):
 
 @pytest.fixture
 def presets():
-    p = Preset("h2s-pla-020", "H2S PLA 0.20", Path("/m.json"), Path("/p.json"), Path("/f.json"))
+    p = Preset("h2s-pla-020", "H2S PLA 0.20", Path("/m.json"), Path("/p.json"), Path("/f/Bambu PLA Basic @BBL H2S.json"))
     return PresetConfig(presets={"h2s-pla-020": p}, defaults=Overrides(15, False, 1))
 
 

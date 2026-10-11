@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     error         TEXT,
     log_tail      TEXT,
     duration_s    REAL,
-    auto_start    INTEGER NOT NULL DEFAULT 1
+    auto_start    INTEGER NOT NULL DEFAULT 1,
+    slot          TEXT
 );
 CREATE TABLE IF NOT EXISTS flags (
     name   TEXT PRIMARY KEY,
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS flags (
 _MIGRATIONS = [
     # (column, DDL) — applied when the column is missing from an older database
     ("auto_start", "ALTER TABLE jobs ADD COLUMN auto_start INTEGER NOT NULL DEFAULT 1"),
+    ("slot", "ALTER TABLE jobs ADD COLUMN slot TEXT"),
 ]
 
 
@@ -57,6 +59,7 @@ class JobSpec:
     preset: str
     overrides: Overrides
     auto_start: bool = True
+    slot: str | None = None  # AMS slot to print from ("A1".."A4"); None = let Bambu Connect choose
 
 
 @dataclass
@@ -110,10 +113,10 @@ class Database:
         with self._lock, self._conn:
             self._conn.execute(
                 "INSERT INTO jobs (id, created, updated, status, stage, stages_seen, preset, overrides, parts,"
-                " auto_start) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                " auto_start, slot) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (job.id, job.created, job.updated, job.status, job.stage, "[]", spec.preset,
                  json.dumps(asdict(spec.overrides)), json.dumps([asdict(p) for p in spec.parts]),
-                 1 if spec.auto_start else 0),
+                 1 if spec.auto_start else 0, spec.slot),
             )
         return job
 
@@ -195,6 +198,7 @@ def _row_to_job(row: sqlite3.Row) -> Job:
         preset=row["preset"],
         overrides=Overrides(**json.loads(row["overrides"])),
         auto_start=bool(row["auto_start"]) if "auto_start" in row.keys() else True,
+        slot=row["slot"] if "slot" in row.keys() else None,
     )
     return Job(
         id=row["id"], created=row["created"], updated=row["updated"], status=row["status"],
