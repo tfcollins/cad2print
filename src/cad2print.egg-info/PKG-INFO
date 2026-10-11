@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: cad2print
-Version: 0.1.2
+Version: 0.2.0
 Summary: Pull parts from Onshape, slice with OrcaSlicer, hand off to Bambu Connect
 Requires-Python: >=3.11
 Requires-Dist: fastapi>=0.115

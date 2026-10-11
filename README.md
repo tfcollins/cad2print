@@ -28,6 +28,17 @@ docker compose up --build       # http://localhost:8080, plates in ./data/handof
 docker compose exec cad2print /opt/venv/bin/pytest -m slow tests/integration
 ```
 
+## Auto-start
+
+With `BAMBU_HOST`, `BAMBU_SERIAL` and `BAMBU_ACCESS_CODE` set, cad2print watches the printer
+over read-only LAN MQTT and queues plates: a job waits until the printer is idle **and** you
+press **Bed cleared**, then drops the plate into `<handoff>/auto/`, where the Windows script
+in the infra repo (`stacks/apps/cad2print/bambu-win/Auto-Print.ps1`) drives Bambu Connect
+through UI Automation and reports back with `<plate>.started` / `<plate>.failed` markers.
+Plates are post-processed (`plate3mf.py`) with a thumbnail, printer model id, job name and
+bed type, because OrcaSlicer 2.4.2's CLI cannot render thumbnails and Bambu Connect silently
+rejects a 3MF without one.
+
 ## Presets
 
 `profiles.yaml` maps each preset to OrcaSlicer machine/process/filament JSONs under the image's

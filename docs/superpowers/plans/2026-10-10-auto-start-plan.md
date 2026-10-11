@@ -20,3 +20,10 @@ Spec: docs/superpowers/specs/2026-10-10-auto-start-design.md. TDD per task; comm
 - **A6 bambu-win scripts:** `Auto-Print.ps1`, shortcut flags, Watch-Prints exclusion,
   `install.ps1`; dry-run first, then one real start with the bed confirmed clear.
 - **A7 Infra + deploy:** env.j2, docs, playbook unchanged; tag v0.2.0; deploy; e2e.
+
+## Outcome (2026-10-10)
+- All tasks done; v0.2.0. Findings that changed the design: Bambu Connect needs the UNC path
+  (mapped drive → empty file name); it rejects 3MFs without plate thumbnails (`plate3mf.py`
+  injects them — OrcaSlicer 2.4.2 CLI bug, fixed upstream after the release); modal Windows
+  carry unreliable UIA names (found via `semi-modal-title`); the printer refuses plates sliced
+  for another build plate (`bed_type` in presets, Textured PEI Plate).
