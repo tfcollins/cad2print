@@ -1,0 +1,50 @@
+{
+ "print": {
+  "ams": {
+   "ams": [
+    {
+     "id": "0",
+     "humidity": "1",
+     "tray": [
+      {
+       "id": "0",
+       "tray_type": "PLA",
+       "tray_sub_brands": "PLA Basic",
+       "tray_color": "000000FF",
+       "remain": 95,
+       "state": 11,
+       "tray_info_idx": "GFA00"
+      },
+      {
+       "id": "1",
+       "tray_type": "PLA",
+       "tray_sub_brands": "PLA Basic",
+       "tray_color": "8E9089FF",
+       "remain": -1,
+       "state": 27,
+       "tray_info_idx": "GFA00"
+      },
+      {
+       "id": "2",
+       "tray_type": "PLA",
+       "tray_sub_brands": "PLA Basic",
+       "tray_color": "8E9089FF",
+       "remain": 22,
+       "state": 11,
+       "tray_info_idx": "GFA00"
+      },
+      {
+       "id": "3",
+       "tray_type": "PLA",
+       "tray_sub_brands": "PLA Basic",
+       "tray_color": "00AE42FF",
+       "remain": 16,
+       "state": 11,
+       "tray_info_idx": "GFA00"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

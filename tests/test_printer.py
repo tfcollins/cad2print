@@ -63,3 +63,38 @@ def test_unknown_state_blocks_dispatch():
     s = apply_push(PrinterState.offline(), {"print": {"mc_percent": 3}}, now=1.0)
     allowed, why = may_dispatch(s, bed_cleared=True, now=2.0, stale_after_s=30)
     assert not allowed and "state" in why
+
+
+# --- AMS trays -------------------------------------------------------------------------------
+
+AMS = json.loads((Path(__file__).parent / "fixtures" / "h2s_push_ams.json").read_text())
+
+
+def test_ams_push_yields_slots_with_type_colour_and_remaining():
+    s = apply_push(PrinterState.offline(), AMS, now=1.0)
+    assert [t.slot for t in s.trays] == ["A1", "A2", "A3", "A4"]
+    a1 = s.trays[0]
+    assert (a1.material, a1.sub_brand, a1.color, a1.remain) == ("PLA", "PLA Basic", "#000000", 95)
+    assert s.trays[1].remain is None, "-1 means unknown"
+    assert s.trays[3].color == "#00AE42" and s.trays[3].remain == 16
+
+
+def test_trays_persist_across_partial_pushes_and_update_when_resent():
+    s = apply_push(PrinterState.offline(), AMS, now=1.0)
+    s2 = apply_push(s, {"print": {"mc_percent": 5}}, now=2.0)
+    assert s2.trays == s.trays
+    changed = json.loads(json.dumps(AMS)); changed["print"]["ams"]["ams"][0]["tray"][0]["remain"] = 50
+    assert apply_push(s2, changed, now=3.0).trays[0].remain == 50
+
+
+def test_empty_tray_is_reported_as_empty():
+    empty = {"print": {"ams": {"ams": [{"id": "0", "tray": [{"id": "0"}, {"id": "1", "tray_type": "PETG", "tray_color": "FF0000FF", "remain": 80}]}]}}}
+    s = apply_push(PrinterState.offline(), empty, now=1.0)
+    assert s.trays[0].empty and s.trays[0].slot == "A1"
+    assert not s.trays[1].empty and s.trays[1].material == "PETG" and s.trays[1].label == "A2 PETG 80%"
+
+
+def test_slot_label_includes_sub_brand_and_unknown_remaining():
+    s = apply_push(PrinterState.offline(), AMS, now=1.0)
+    assert s.trays[0].label == "A1 PLA Basic 95%"
+    assert s.trays[1].label == "A2 PLA Basic"

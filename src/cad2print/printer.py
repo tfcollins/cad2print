@@ -21,6 +21,25 @@ READY_STATES = {"IDLE", "FINISH", "FAILED"}
 
 
 @dataclass(frozen=True)
+class Tray:
+    """One AMS slot as the printer reports it."""
+    slot: str            # "A1".."A4" (second AMS would be B1..)
+    material: str        # tray_type, e.g. "PLA"
+    sub_brand: str       # e.g. "PLA Basic"
+    color: str           # "#RRGGBB"
+    remain: int | None   # percent, None when the printer does not know
+
+    @property
+    def empty(self) -> bool:
+        return not self.material
+
+    @property
+    def label(self) -> str:
+        name = self.sub_brand or self.material
+        return f"{self.slot} {name}" + (f" {self.remain}%" if self.remain is not None else "")
+
+
+@dataclass(frozen=True)
 class PrinterState:
     online: bool
     updated_at: float  # monotonic seconds of the last message
@@ -28,6 +47,7 @@ class PrinterState:
     percent: int | None = None
     remaining_min: int | None = None
     task_name: str | None = None
+    trays: tuple[Tray, ...] = ()
 
     @classmethod
     def offline(cls) -> "PrinterState":
@@ -55,7 +75,27 @@ def apply_push(state: PrinterState, payload: dict, now: float) -> PrinterState:
         new = replace(new, remaining_min=_int(p["mc_remaining_time"]))
     if "subtask_name" in p:
         new = replace(new, task_name=str(p["subtask_name"]))
+    if isinstance(p.get("ams"), dict) and isinstance(p["ams"].get("ams"), list):
+        new = replace(new, trays=_parse_trays(p["ams"]["ams"]))
     return new
+
+
+def _parse_trays(units: list) -> tuple[Tray, ...]:
+    trays = []
+    for ui, unit in enumerate(units):
+        letter = chr(ord("A") + ui)
+        for ti, t in enumerate(unit.get("tray") or []):
+            idx = _int(t.get("id"))
+            n = (idx if idx is not None else ti) + 1
+            remain = _int(t.get("remain"))
+            trays.append(Tray(
+                slot=f"{letter}{n}",
+                material=str(t.get("tray_type") or ""),
+                sub_brand=str(t.get("tray_sub_brands") or ""),
+                color="#" + str(t.get("tray_color") or "")[:6].upper() if t.get("tray_color") else "",
+                remain=remain if remain is not None and remain >= 0 else None,
+            ))
+    return tuple(trays)
 
 
 def may_dispatch(state: PrinterState, *, bed_cleared: bool, now: float, stale_after_s: float) -> tuple[bool, str]:
