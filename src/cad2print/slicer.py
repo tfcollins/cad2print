@@ -29,6 +29,7 @@ def build_command(orca_bin: str, stl_paths: list[Path], preset: Preset, override
         "--load-filaments", str(preset.filament),
         f"--sparse-infill-density={overrides.infill}%",
         f"--enable-support={1 if overrides.supports else 0}",
+        *([f"--curr-bed-type={preset.bed_type}"] if preset.bed_type else []),
         "--arrange", "1", "--orient", "1", "--slice", "0",
         "--export-3mf", out_name,
         "--outputdir", str(out_dir),

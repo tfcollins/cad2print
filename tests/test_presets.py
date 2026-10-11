@@ -61,3 +61,12 @@ def test_overrides_merge_form_values_onto_defaults():
 def test_overrides_reject_out_of_range_values(bad):
     with pytest.raises(ValueError):
         Overrides(infill=15, supports=False, copies=1).merged(bad)
+
+
+def test_bed_type_comes_from_the_preset_or_the_file_default(tmp_path):
+    presets = {"a": dict(GOOD["h2s-pla-020"], bed_type="Cool Plate"), "b": GOOD["h2s-pla-020"]}
+    f = _write(tmp_path, presets)
+    doc = yaml.safe_load(f.read_text()); doc["bed_type"] = "Textured PEI Plate"; f.write_text(yaml.safe_dump(doc, sort_keys=False))
+    cfg = load_presets(f)
+    assert cfg.presets["a"].bed_type == "Cool Plate"
+    assert cfg.presets["b"].bed_type == "Textured PEI Plate"

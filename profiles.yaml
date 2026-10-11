@@ -3,6 +3,12 @@
 # see docs/spike-cli.md). Add a preset = add a key here; the UI lists them in this order.
 profiles_dir: /opt/orcaslicer/resources/profiles/BBL
 
+# Build plate installed on the printer. The printer refuses a plate sliced for another type
+# ("Build plate mismatch with slicer settings"). Override per preset with `bed_type:`.
+# Orca names: "Cool Plate", "Engineering Plate", "High Temp Plate", "Textured PEI Plate",
+# "Textured Cool Plate", "Smooth Cool Plate", "Smooth High Temp Plate".
+bed_type: "Textured PEI Plate"
+
 presets:
   h2s-pla-020:
     label: "PLA Basic, 0.20 mm Standard (H2S, 0.4 nozzle)"

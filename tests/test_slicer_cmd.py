@@ -79,3 +79,15 @@ def test_xvfb_wrapper_is_prepended_when_requested():
     cmd = build_command("orca", [Path("/a.stl")], PRESET, Overrides(15, False, 1), Path("/o"),
                         "x.gcode.3mf", use_xvfb=True)
     assert cmd[:3] == ["xvfb-run", "-a", "orca"]
+
+
+def test_bed_type_from_preset_is_passed_to_the_slicer():
+    from cad2print.presets import Preset
+    preset = Preset("p", "P", PRESET.machine, PRESET.process, PRESET.filament, bed_type="Textured PEI Plate")
+    cmd = build_command("orca", [Path("/a.stl")], preset, Overrides(15, False, 1), Path("/o"), "x.gcode.3mf")
+    assert "--curr-bed-type=Textured PEI Plate" in cmd
+
+
+def test_no_bed_type_means_no_flag():
+    cmd = build_command("orca", [Path("/a.stl")], PRESET, Overrides(15, False, 1), Path("/o"), "x.gcode.3mf")
+    assert not any(a.startswith("--curr-bed-type") for a in cmd)

@@ -42,6 +42,7 @@ class Preset:
     machine: Path
     process: Path
     filament: Path
+    bed_type: str = ""  # OrcaSlicer curr_bed_type, e.g. "Textured PEI Plate"; must match the plate on the printer
 
 
 @dataclass(frozen=True)
@@ -64,7 +65,8 @@ def load_presets(path: Path | str) -> PresetConfig:
             if not p.is_file():
                 raise PresetError(f"preset {key!r}: {kind} profile not found: {p}")
             files[kind] = p
-        presets[key] = Preset(key=key, label=spec.get("label", key), **files)
+        presets[key] = Preset(key=key, label=spec.get("label", key),
+                              bed_type=str(spec.get("bed_type") or doc.get("bed_type") or ""), **files)
     if not presets:
         raise PresetError(f"{path}: no presets defined")
     d = doc.get("defaults") or {}
