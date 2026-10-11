@@ -67,7 +67,7 @@ table.parts label { cursor: pointer; }
 .summary ul { margin: .25rem 0 0; padding-left: 1.2rem; }
 
 /* The job page: a four-stage track that fills like printed layers. */
-.track { list-style: none; padding: 0; margin: 1.25rem 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.track { list-style: none; padding: 0; margin: 1.25rem 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
 .track li { padding: .5rem 0 0; border-top: 6px solid var(--rule); color: var(--muted); font-size: .9rem; }
 .track li.done { border-top-color: var(--act); color: var(--ink); }
 .track li.active { border-top-color: var(--act); color: var(--ink); font-weight: 500; background: linear-gradient(90deg, var(--act) 0 50%, transparent 50% 100%) top/200% 6px no-repeat; animation: layer 1.2s linear infinite; }
@@ -94,7 +94,7 @@ pre.log { font-family: var(--mono); font-size: .8rem; line-height: 1.4; backgrou
 
 @media (max-width: 600px) {
   form.row { flex-direction: column; align-items: stretch; }
-  .track { grid-template-columns: repeat(2, 1fr); }
+  .track { grid-auto-flow: row; grid-template-columns: repeat(2, 1fr); }
   .top { flex-wrap: wrap; gap: .75rem 1.5rem; }
 }
 
