@@ -34,6 +34,7 @@ src/cad2print/templates/index.html
 src/cad2print/templates/job.html
 src/cad2print/templates/parts.html
 src/cad2print/templates/setup.html
+tests/test_config_wiring.py
 tests/test_handoff.py
 tests/test_job_routes.py
 tests/test_jobs.py

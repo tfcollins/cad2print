@@ -26,6 +26,10 @@ class Settings:
     slice_timeout_s: int = 600
     export_timeout_s: int = 120
     log_tail_lines: int = 40
+    bambu_host: str = ""
+    bambu_serial: str = ""
+    bambu_access_code: str = ""
+    start_timeout_s: int = 240
     extra: dict = field(default_factory=dict, compare=False)
 
     @classmethod
@@ -44,4 +48,8 @@ class Settings:
             slice_timeout_s=int(e.get("SLICE_TIMEOUT_S", cls.slice_timeout_s)),
             export_timeout_s=int(e.get("EXPORT_TIMEOUT_S", cls.export_timeout_s)),
             log_tail_lines=int(e.get("LOG_TAIL_LINES", cls.log_tail_lines)),
+            bambu_host=e.get("BAMBU_HOST", ""),
+            bambu_serial=e.get("BAMBU_SERIAL", ""),
+            bambu_access_code=e.get("BAMBU_ACCESS_CODE", ""),
+            start_timeout_s=int(e.get("START_TIMEOUT_S", cls.start_timeout_s)),
         )

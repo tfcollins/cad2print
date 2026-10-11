@@ -119,3 +119,15 @@ def test_model_id_lookup_reads_the_printer_model_json(tmp_path):
     assert printer_model_id_for(machine / "Bambu Lab H2S 0.4 nozzle.json") == "O1S"
     (machine / "Weird.json").write_text('{"type": "machine"}')
     assert printer_model_id_for(machine / "Weird.json") == ""
+
+
+def test_finalize_names_the_plate_so_the_printer_shows_it(tmp_path):
+    p = _make(tmp_path)
+    finalize_plate(p, thumbnail_png=None, printer_model_id="O1S", plate_name="Rack Mount")
+    with zipfile.ZipFile(p) as z:
+        ms = z.read("Metadata/model_settings.config").decode()
+        assert '<metadata key="plater_name" value="Rack Mount"/>' in ms
+    q = tmp_path / "b"; q.mkdir()
+    finalize_plate(_make(q), thumbnail_png=None, printer_model_id="O1S", plate_name='A<"B"&C')
+    with zipfile.ZipFile(q / "cube.gcode.3mf") as z:
+        assert 'value="A&lt;&quot;B&quot;&amp;C"' in z.read("Metadata/model_settings.config").decode()

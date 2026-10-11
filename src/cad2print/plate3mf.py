@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from xml.sax.saxutils import escape
 import struct
 import tempfile
 import zipfile
@@ -69,7 +70,8 @@ def printer_model_id_for(machine_json: Path) -> str:
         return ""
 
 
-def finalize_plate(path: Path, *, thumbnail_png: bytes | None, printer_model_id: str) -> Path:
+def finalize_plate(path: Path, *, thumbnail_png: bytes | None, printer_model_id: str,
+                   plate_name: str = "") -> Path:
     path = Path(path)
     png = thumbnail_png or PLACEHOLDER_PNG
     with zipfile.ZipFile(path) as src:
@@ -87,6 +89,14 @@ def finalize_plate(path: Path, *, thumbnail_png: bytes | None, printer_model_id:
         entries["Metadata/model_settings.config"] = ms.encode("utf-8")
         for name in list(PNG_ENTRIES.values()) + EXTRA_PNGS:
             entries.setdefault(name, png)
+
+    if plate_name:
+        # The printer and Bambu Connect show plater_name as the job name (else ".3mf").
+        ms = entries["Metadata/model_settings.config"].decode("utf-8")
+        ms = re.sub(r'<metadata key="plater_name" value=""/>',
+                    lambda _m: f'<metadata key="plater_name" value="{escape(plate_name, {chr(34): "&quot;"})}"/>',
+                    ms, count=1)
+        entries["Metadata/model_settings.config"] = ms.encode("utf-8")
 
     if printer_model_id and "Metadata/slice_info.config" in entries:
         si = entries["Metadata/slice_info.config"].decode("utf-8")

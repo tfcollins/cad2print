@@ -169,7 +169,8 @@ class JobRunner:
         # Bambu Connect needs a plate thumbnail + printer model id that the CLI cannot produce.
         try:
             plate3mf.finalize_plate(result.out_path, thumbnail_png=self._thumbnail_for(job),
-                                    printer_model_id=plate3mf.printer_model_id_for(preset.machine))
+                                    printer_model_id=plate3mf.printer_model_id_for(preset.machine),
+                                    plate_name=job.title)
         except (OSError, ValueError, zipfile.BadZipFile) as e:
             self.db.finish(job.id, error=f"could not finalize the sliced plate: {e}", log_tail=result.log_tail,
                            duration_s=time.monotonic() - start)

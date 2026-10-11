@@ -14,6 +14,7 @@ from .db import Database
 from .jobs import JobRunner
 from .onshape import OnshapeClient
 from .presets import PresetConfig, load_presets
+from .printer import PrinterMonitor
 from .slicer import run as real_slice
 
 _HERE = Path(__file__).parent
@@ -28,10 +29,14 @@ def create_app(settings: Settings | None = None, *, onshape=None, presets: Prese
                                        settings.onshape_base_url)
     presets = presets or load_presets(settings.profiles_file)
     db = Database(settings.db_path)
+    monitor = None
+    if settings.bambu_host and settings.bambu_serial and settings.bambu_access_code:
+        monitor = PrinterMonitor(settings.bambu_host, settings.bambu_serial, settings.bambu_access_code)
     runner = JobRunner(db=db, presets=presets, onshape=onshape, work_dir=settings.work_dir,
                        handoff_dir=settings.handoff_dir, orca_bin=settings.orca_bin,
                        use_xvfb=settings.use_xvfb, slice_timeout_s=settings.slice_timeout_s,
-                       tail_lines=settings.log_tail_lines, slice_fn=slice_fn)
+                       tail_lines=settings.log_tail_lines, slice_fn=slice_fn, printer=monitor,
+                       start_timeout_s=settings.start_timeout_s)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -39,11 +44,16 @@ def create_app(settings: Settings | None = None, *, onshape=None, presets: Prese
             raise RuntimeError(f"handoff dir {settings.handoff_dir} does not exist — is the prints share mounted?")
         if not settings.onshape_access_key:
             logging.getLogger(__name__).warning("ONSHAPE_ACCESS_KEY is empty; Onshape calls will fail")
+        (settings.handoff_dir / "auto").mkdir(exist_ok=True)
+        if monitor is not None:
+            monitor.start()
         runner.start()
         try:
             yield
         finally:
             runner.stop()
+            if monitor is not None:
+                monitor.stop()
             db.close()
 
     app = FastAPI(title="cad2print", lifespan=lifespan)
