@@ -244,3 +244,128 @@ def test_existing_database_without_the_column_is_migrated(tmp_path):
     con.commit(); con.close()
     db = Database(path)
     assert db.get("old1").spec.auto_start is True
+
+
+# --- auto-start (A3): dispatcher ---------------------------------------------------------------
+
+from cad2print.printer import PrinterState
+
+
+class FakePrinter:
+    def __init__(self, gcode_state="IDLE"):
+        self.now = 1000.0
+        self.state = PrinterState(online=True, updated_at=self.now, gcode_state=gcode_state)
+        self.enabled = True
+
+    def set(self, gcode_state):
+        self.state = PrinterState(online=True, updated_at=self.now, gcode_state=gcode_state)
+
+
+def _auto_runner(env, printer, slicer=None, start_timeout_s=5.0):
+    r = _runner(env, FakeOnshape(), slicer or FakeSlicer())
+    r.printer = printer
+    r.start_timeout_s = start_timeout_s
+    r.clock = lambda: printer.now
+    return r
+
+
+def test_auto_job_parks_in_waiting_for_printer_after_slicing(env):
+    r = _auto_runner(env, FakePrinter("RUNNING"))
+    job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults, auto_start=True))
+    r.run_one(job.id)
+    j = env["db"].get(job.id)
+    assert j.status == "running" and j.stage == "waiting_for_printer"
+    assert j.handoff_name is None and not list((env["handoff"]).glob("*.3mf"))
+    assert (env["work"] / job.id / f"{job.id}.gcode.3mf").is_file(), "sliced plate kept until dispatch"
+
+
+def test_manual_job_ignores_the_gate(env):
+    r = _auto_runner(env, FakePrinter("RUNNING"))
+    job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults, auto_start=False))
+    r.run_one(job.id)
+    assert env["db"].get(job.id).status == "done"
+    assert (env["handoff"] / "Plate.gcode.3mf").is_file()
+
+
+def test_dispatch_waits_for_idle_and_bed_cleared_then_publishes_into_auto_dir(env):
+    printer = FakePrinter("RUNNING")
+    r = _auto_runner(env, printer)
+    job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults, auto_start=True))
+    r.run_one(job.id)
+    assert r.dispatch_next() is None and env["db"].get(job.id).stage == "waiting_for_printer"
+    printer.set("FINISH")
+    assert r.dispatch_next() is None, "bed not cleared yet"
+    env["db"].set_flag("bed_cleared", True)
+    assert r.dispatch_next() == job.id
+    j = env["db"].get(job.id)
+    assert j.stage == "starting" and j.handoff_name == "Plate.gcode.3mf"
+    assert (env["handoff"] / "auto" / "Plate.gcode.3mf").is_file()
+    assert env["db"].get_flag("bed_cleared") is False, "flag consumed by the dispatch"
+
+
+def test_dispatch_is_fifo_and_one_at_a_time(env):
+    printer = FakePrinter("IDLE")
+    r = _auto_runner(env, printer)
+    a = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); r.run_one(a.id)
+    b = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); r.run_one(b.id)
+    env["db"].set_flag("bed_cleared", True)
+    assert r.dispatch_next() == a.id
+    env["db"].set_flag("bed_cleared", True)
+    assert r.dispatch_next() is None, "a is still starting; b must wait"
+
+
+def test_starting_job_completes_when_marker_and_printer_agree(env):
+    printer = FakePrinter("IDLE")
+    r = _auto_runner(env, printer)
+    job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); r.run_one(job.id)
+    env["db"].set_flag("bed_cleared", True); r.dispatch_next()
+    r.check_starting()
+    assert env["db"].get(job.id).stage == "starting"
+    (env["handoff"] / "auto" / "Plate.gcode.3mf.started").write_text("ok")
+    r.check_starting()
+    assert env["db"].get(job.id).stage == "starting", "marker alone is not enough"
+    printer.set("RUNNING")
+    r.check_starting()
+    j = env["db"].get(job.id)
+    assert j.status == "done" and j.stage == "done"
+    assert not (env["work"] / job.id).exists()
+
+
+def test_starting_job_fails_on_failed_marker_with_its_message(env):
+    printer = FakePrinter("IDLE")
+    r = _auto_runner(env, printer)
+    job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); r.run_one(job.id)
+    env["db"].set_flag("bed_cleared", True); r.dispatch_next()
+    (env["handoff"] / "auto" / "Plate.gcode.3mf.failed").write_text("print button not found")
+    r.check_starting()
+    j = env["db"].get(job.id)
+    assert j.status == "failed" and "print button not found" in j.error
+    assert (env["handoff"] / "auto" / "Plate.gcode.3mf").is_file(), "plate left for a manual retry"
+
+
+def test_starting_job_times_out_with_a_pointer_to_bambu_win(env):
+    printer = FakePrinter("IDLE")
+    r = _auto_runner(env, printer, start_timeout_s=30)
+    job = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); r.run_one(job.id)
+    env["db"].set_flag("bed_cleared", True); r.dispatch_next()
+    printer.now += 31
+    r.check_starting()
+    j = env["db"].get(job.id)
+    assert j.status == "failed" and "bambu-win" in j.error
+
+
+def test_bed_cleared_flag_resets_when_printer_starts_on_its_own(env):
+    printer = FakePrinter("IDLE")
+    r = _auto_runner(env, printer)
+    env["db"].set_flag("bed_cleared", True)
+    printer.set("RUNNING"); r.tick()
+    assert env["db"].get_flag("bed_cleared") is False
+
+
+def test_queue_position_and_gate_reason_are_exposed(env):
+    printer = FakePrinter("RUNNING")
+    r = _auto_runner(env, printer)
+    a = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); r.run_one(a.id)
+    b = r.submit(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); r.run_one(b.id)
+    assert r.queue_position(b.id) == 2
+    assert "printing" in r.gate_reason()

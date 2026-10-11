@@ -149,6 +149,15 @@ class Database:
                                " ON CONFLICT(name) DO UPDATE SET value = excluded.value",
                                (name, 1 if value else 0))
 
+    def save_log(self, job_id: str, log_tail: str | None) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("UPDATE jobs SET log_tail = ? WHERE id = ?", (log_tail, job_id))
+
+    def set_handoff_name(self, job_id: str, name: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("UPDATE jobs SET handoff_name = ?, updated = ? WHERE id = ?",
+                               (name, _now(), job_id))
+
     def set_stage(self, job_id: str, stage: str, status: str = "running") -> None:
         with self._lock, self._conn:
             seen = json.loads(self._conn.execute(

@@ -17,6 +17,7 @@ from . import handoff, slicer
 from .db import Database, Job, JobSpec, PartRef  # re-exported for callers
 from .onshape import OnshapeError
 from .presets import PresetConfig
+from .printer import PrinterState, may_dispatch
 
 __all__ = ["Job", "JobSpec", "PartRef", "JobRunner"]
 
@@ -30,10 +31,28 @@ class _Exporter(Protocol):
 SliceFn = Callable[..., slicer.SliceResult]
 
 
+class _NoPrinter:
+    """Stand-in when no printer is configured: auto-start jobs can never dispatch."""
+    enabled = False
+    state = PrinterState.offline()
+
+
+AUTO_SUBDIR = "auto"
+STARTED_SUFFIX, FAILED_SUFFIX = ".started", ".failed"
+
+
 class JobRunner:
     def __init__(self, *, db: Database, presets: PresetConfig, onshape: _Exporter, work_dir: Path,
                  handoff_dir: Path, orca_bin: str, use_xvfb: bool = False, slice_timeout_s: float = 600,
-                 tail_lines: int = 40, slice_fn: SliceFn = slicer.run):
+                 tail_lines: int = 40, slice_fn: SliceFn = slicer.run, printer=None,
+                 start_timeout_s: float = 240.0, stale_after_s: float = 30.0, tick_s: float = 2.0):
+        self.printer = printer or _NoPrinter()
+        self.start_timeout_s = start_timeout_s
+        self.stale_after_s = stale_after_s
+        self.tick_s = tick_s
+        self.clock = time.monotonic
+        self._last_printer_busy = False
+        self._dispatched_at: dict[str, float] = {}
         self.db = db
         self.presets = presets
         self.onshape = onshape
@@ -92,7 +111,14 @@ class JobRunner:
 
     def _loop(self) -> None:
         while True:
-            job_id = self._q.get()
+            try:
+                job_id = self._q.get(timeout=self.tick_s)
+            except queue.Empty:
+                try:
+                    self.tick()
+                except Exception:
+                    log.exception("dispatcher tick failed")
+                continue
             if job_id is None:
                 break
             try:
@@ -139,6 +165,12 @@ class JobRunner:
                            duration_s=time.monotonic() - start)
             return
 
+        if job.spec.auto_start and self.printer.enabled:
+            # Park until the printer is free and the bed has been confirmed clear (see tick()).
+            self.db.set_stage(job.id, "waiting_for_printer")
+            self.db.save_log(job.id, result.log_tail)
+            return
+
         self.db.set_stage(job.id, "handing_off")
         try:
             published = handoff.publish(result.out_path, job.title, self.handoff_dir)
@@ -150,3 +182,76 @@ class JobRunner:
         self.db.finish(job.id, handoff_name=published.name, log_tail=result.log_tail,
                        duration_s=time.monotonic() - start)
         shutil.rmtree(work, ignore_errors=True)
+
+    # -- auto-start dispatcher ---------------------------------------------------------------
+
+    @property
+    def auto_dir(self) -> Path:
+        return self.handoff_dir / AUTO_SUBDIR
+
+    def tick(self) -> None:
+        """Periodic housekeeping: reset the bed flag when the printer starts, then dispatch/check."""
+        busy = self.printer.state.busy
+        if busy and not self._last_printer_busy:
+            self.db.set_flag("bed_cleared", False)
+        self._last_printer_busy = busy
+        self.check_starting()
+        self.dispatch_next()
+
+    def gate_reason(self) -> str:
+        ok, why = may_dispatch(self.printer.state, bed_cleared=self.db.get_flag("bed_cleared"),
+                               now=self.clock(), stale_after_s=self.stale_after_s)
+        if not self.printer.enabled:
+            return "no printer configured"
+        return "" if ok else why
+
+    def queue_position(self, job_id: str) -> int | None:
+        for i, j in enumerate(self.db.list_by_stage("waiting_for_printer"), start=1):
+            if j.id == job_id:
+                return i
+        return None
+
+    def dispatch_next(self) -> str | None:
+        """Hand the oldest waiting plate to Bambu Connect if the printer is free; returns its id."""
+        if self.db.list_by_stage("starting"):
+            return None
+        waiting = self.db.list_by_stage("waiting_for_printer")
+        if not waiting or not self.printer.enabled:
+            return None
+        ok, _ = may_dispatch(self.printer.state, bed_cleared=self.db.get_flag("bed_cleared"),
+                             now=self.clock(), stale_after_s=self.stale_after_s)
+        if not ok:
+            return None
+        job = waiting[0]
+        plate = self.work_dir / job.id / f"{job.id}.gcode.3mf"
+        try:
+            self.auto_dir.mkdir(exist_ok=True)
+            published = handoff.publish(plate, job.title, self.auto_dir)
+        except OSError as e:
+            self.db.finish(job.id, error=f"could not write to the auto-start folder: {e}")
+            return None
+        self.db.set_flag("bed_cleared", False)
+        self.db.set_handoff_name(job.id, published.name)
+        self.db.set_stage(job.id, "starting")
+        self._dispatched_at[job.id] = self.clock()
+        return job.id
+
+    def check_starting(self) -> None:
+        """Resolve jobs in `starting` from bambu-win's marker files and the printer's state."""
+        for job in self.db.list_by_stage("starting"):
+            plate = self.auto_dir / (job.handoff_name or "")
+            failed = plate.with_name(plate.name + FAILED_SUFFIX)
+            started = plate.with_name(plate.name + STARTED_SUFFIX)
+            since = self.clock() - self._dispatched_at.get(job.id, self.clock())
+            if failed.is_file():
+                msg = failed.read_text(errors="replace").strip() or "Bambu Connect did not start the print"
+                self.db.finish(job.id, error=f"print did not start — {msg} (check Bambu Connect on bambu-win)")
+            elif started.is_file() and self.printer.state.busy:
+                self.db.finish(job.id, handoff_name=job.handoff_name, duration_s=job.duration_s)
+                shutil.rmtree(self.work_dir / job.id, ignore_errors=True)
+            elif since > self.start_timeout_s:
+                self.db.finish(job.id, error="print did not start within the time limit — "
+                                             "check Bambu Connect on bambu-win")
+            else:
+                continue
+            self._dispatched_at.pop(job.id, None)
