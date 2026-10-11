@@ -1,3 +1,4 @@
+import pytest
 import re
 
 from tests.conftest import DID, EID, WID
@@ -97,3 +98,64 @@ def test_create_job_with_unknown_preset_is_rejected(client):
 def test_hostile_part_name_is_escaped_in_setup_page(client):
     html = client.post("/setup", data={**FORM, "name_JHD": "<script>alert(1)</script>"}).text
     assert "<script>alert(1)</script>" not in html and "&lt;script&gt;" in html
+
+
+# --- auto-start UI (A4) ------------------------------------------------------------------------
+
+from cad2print.printer import PrinterState
+
+
+class FakeMonitor:
+    enabled = True
+
+    def __init__(self):
+        self.state = PrinterState(online=True, updated_at=10.0, gcode_state="IDLE")
+
+
+@pytest.fixture
+def auto_app(app):
+    app.state.runner.printer = FakeMonitor()
+    app.state.runner.clock = lambda: 11.0
+    return app
+
+
+def test_setup_form_offers_auto_start_checked_by_default(client, auto_app):
+    html = client.post("/setup", data=FORM).text
+    assert 'name="auto_start"' in html and "checked" in html.split('name="auto_start"')[1][:40]
+
+
+def test_setup_form_hides_auto_start_without_a_printer(client):
+    html = client.post("/setup", data=FORM).text
+    assert 'name="auto_start"' not in html
+
+
+def test_create_job_records_auto_start_choice(client, auto_app, app):
+    on = _create(client, auto_start="on").headers["location"].rsplit("/", 1)[1]
+    off = _create(client).headers["location"].rsplit("/", 1)[1]
+    assert app.state.db.get(on).spec.auto_start is True
+    assert app.state.db.get(off).spec.auto_start is False
+
+
+def test_printer_strip_shows_state_and_bed_cleared_button(client, auto_app):
+    html = client.get("/printer/strip").text
+    assert "Idle" in html and 'action="/printer/bed-cleared"' in html
+    assert "Bed cleared" in html
+
+
+def test_bed_cleared_post_sets_flag_and_returns_strip(client, auto_app, app):
+    r = client.post("/printer/bed-cleared")
+    assert r.status_code == 200 and app.state.db.get_flag("bed_cleared") is True
+    assert "cleared" in r.text.lower()
+
+
+def test_waiting_job_fragment_shows_queue_position_and_reason(client, auto_app, app):
+    auto_app.state.runner.printer.state = PrinterState(online=True, updated_at=10.0, gcode_state="RUNNING")
+    job_id = _create(client, auto_start="on").headers["location"].rsplit("/", 1)[1]
+    assert app.state.runner.wait_idle(5)
+    frag = client.get(f"/jobs/{job_id}/fragment").text
+    assert "Waiting for printer" in frag and "1 in line" in frag and "printing" in frag
+    assert 'hx-trigger="every 2s"' in frag
+
+
+def test_index_includes_the_printer_strip(client, auto_app):
+    assert 'hx-get="/printer/strip"' in client.get("/").text

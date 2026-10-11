@@ -1,0 +1,17 @@
+<div id="printer" class="printer {% if printer.live %}live{% endif %}" hx-get="/printer/strip" hx-trigger="every 5s" hx-swap="outerHTML">
+{% if not printer.enabled %}
+  <span class="muted">No printer configured: plates go to Bambu Connect for a manual Print click.</span>
+{% else %}
+  <span class="pstate pstate-{{ 'busy' if printer.busy else ('off' if not printer.live else 'ready') }}">H2S: {{ printer.label }}</span>
+  {% if printer.busy and printer.task_name %}<span class="muted">{{ printer.task_name }}{% if printer.percent is not none %}, {{ printer.percent }}%{% endif %}{% if printer.remaining_min %}, {{ printer.remaining_min }} min left{% endif %}</span>{% endif %}
+  {% if printer.waiting %}<span class="muted">{{ printer.waiting }} waiting</span>{% endif %}
+  {% if printer.bed_cleared %}
+    <span class="bed ok">Bed cleared, next plate will start when the printer is free</span>
+  {% else %}
+    <form action="/printer/bed-cleared" method="post" hx-post="/printer/bed-cleared" hx-target="#printer" hx-swap="outerHTML">
+      <button type="submit" class="quiet">Bed cleared</button>
+    </form>
+    {% if printer.waiting and printer.gate_reason %}<span class="muted">{{ printer.gate_reason }}</span>{% endif %}
+  {% endif %}
+{% endif %}
+</div>

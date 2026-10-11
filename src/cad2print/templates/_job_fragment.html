@@ -6,6 +6,18 @@
 </ol>
 {% if job.status == 'queued' %}
 <p class="muted">Queued, waiting for the slicer.</p>
+{% elif job.stage == 'waiting_for_printer' %}
+<div class="next">
+  <strong>Sliced. {% if queue_position %}{{ queue_position }} in line{% endif %}</strong>
+  {% if printer.gate_reason %}Holding: {{ printer.gate_reason }}.{% else %}Starting as soon as the printer is free.{% endif %}
+</div>
+{% elif job.stage == 'starting' %}
+<p class="muted">Handed to Bambu Connect on bambu-win, waiting for the printer to pick it up.</p>
+{% elif job.status == 'done' and 'starting' in job.stages_seen %}
+<div class="next">
+  <strong>Printing.</strong>
+  <span class="filename">{{ job.handoff_name }}</span> was started through Bambu Connect.
+</div>
 {% elif job.status == 'done' %}
 <div class="next">
   <strong>Now click Print in Bambu Connect on bambu-win.</strong>

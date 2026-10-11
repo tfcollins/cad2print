@@ -22,6 +22,7 @@ src/cad2print/routes/jobs.py
 src/cad2print/static/style.css
 src/cad2print/templates/_job_fragment.html
 src/cad2print/templates/_job_list.html
+src/cad2print/templates/_printer_strip.html
 src/cad2print/templates/base.html
 src/cad2print/templates/document.html
 src/cad2print/templates/documents.html

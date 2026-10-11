@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+<div hx-get="/printer/strip" hx-trigger="load" hx-swap="outerHTML"><div id="printer" class="printer"></div></div>
 <section class="hero">
   <h1>Pick a part in Onshape.<br>Get a sliced plate in Bambu Connect.</h1>
   <form class="row" action="/documents" method="get">

@@ -97,3 +97,11 @@ pre.log { font-family: var(--mono); font-size: .8rem; line-height: 1.4; backgrou
   .track { grid-template-columns: repeat(2, 1fr); }
   .top { flex-wrap: wrap; gap: .75rem 1.5rem; }
 }
+
+.printer { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; align-items: center; padding: .6rem 0 .9rem; margin-bottom: 1rem; border-bottom: 1px solid var(--rule); font-size: .95rem; min-height: 2.6rem; }
+.printer form { margin: 0; }
+.pstate { font-weight: 500; }
+.pstate-ready { color: var(--ok); }
+.pstate-busy { color: var(--act); }
+.pstate-off { color: var(--muted); }
+.bed.ok { color: var(--ok); }

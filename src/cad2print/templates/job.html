@@ -4,6 +4,7 @@
 <h1>{{ job.title }}</h1>
 <p class="muted">{{ presets.presets[job.spec.preset].label if job.spec.preset in presets.presets else job.spec.preset }},
   {{ job.spec.overrides.infill }}% infill{% if job.spec.overrides.supports %}, supports{% endif %}{% if job.spec.overrides.copies > 1 %}, &times;{{ job.spec.overrides.copies }}{% endif %}</p>
+{% include "_printer_strip.html" %}
 <div id="job" hx-get="/jobs/{{ job.id }}/fragment" hx-trigger="load" hx-swap="outerHTML">
   {% include "_job_fragment.html" %}
 </div>

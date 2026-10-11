@@ -30,6 +30,7 @@
   </label>
   <div class="checks">
     <label><input type="checkbox" name="supports" {% if defaults.supports %}checked{% endif %}> Add supports</label>
+    {% if printer_enabled %}<label><input type="checkbox" name="auto_start" checked> Start the print automatically when the printer is free and the bed is cleared</label>{% endif %}
   </div>
   <div class="actions">
     <button type="submit">Slice and send to Bambu Connect</button>
