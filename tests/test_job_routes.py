@@ -159,3 +159,11 @@ def test_waiting_job_fragment_shows_queue_position_and_reason(client, auto_app, 
 
 def test_index_includes_the_printer_strip(client, auto_app):
     assert 'hx-get="/printer/strip"' in client.get("/").text
+
+
+def test_failed_job_in_waiting_stage_shows_the_error_not_holding(client, auto_app, app):
+    job_id = _create(client, auto_start="on").headers["location"].rsplit("/", 1)[1]
+    assert app.state.runner.wait_idle(5)
+    app.state.db.finish(job_id, error="interrupted by a cad2print restart; run it again")
+    frag = client.get(f"/jobs/{job_id}/fragment").text
+    assert "interrupted" in frag and "Holding" not in frag

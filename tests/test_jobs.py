@@ -405,3 +405,21 @@ def test_thumbnail_failure_falls_back_to_placeholder(env):
     r.run_one(job.id)
     with zipfile.ZipFile(env["handoff"] / "Plate.gcode.3mf") as z:
         assert z.read("Metadata/plate_1.png") == PLACEHOLDER_PNG
+
+
+def test_parked_and_starting_jobs_survive_a_restart(env):
+    db = env["db"]
+    waiting = db.create(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); db.set_stage(waiting.id, "waiting_for_printer")
+    starting = db.create(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); db.set_stage(starting.id, "starting")
+    slicing = db.create(JobSpec(parts=[PART], preset="p", overrides=CFG.defaults)); db.set_stage(slicing.id, "slicing")
+    r = _auto_runner(env, FakePrinter("RUNNING"), start_timeout_s=30)
+    r.start()
+    try:
+        assert db.get(waiting.id).status == "running" and db.get(waiting.id).stage == "waiting_for_printer"
+        assert db.get(starting.id).status == "running" and db.get(starting.id).stage == "starting"
+        assert db.get(slicing.id).status == "failed"
+        # the restarted 'starting' job gets a fresh timeout window, not an instant timeout
+        r.check_starting()
+        assert db.get(starting.id).status == "running"
+    finally:
+        r.stop()

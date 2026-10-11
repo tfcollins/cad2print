@@ -87,11 +87,14 @@ class JobRunner:
 
     def start(self) -> None:
         if self._thread is None:
-            # Jobs left queued/running by a previous process would poll forever: the queue is
-            # in-memory, so they cannot resume. Fail them visibly instead.
+            # Export/slice progress lived in memory, so jobs caught mid-way cannot resume: fail
+            # them visibly. Parked (waiting_for_printer) and starting jobs are durable: their
+            # plate is on disk and the dispatcher picks them up from the database.
             for job in self.db.list_recent(500):
-                if job.status in {"queued", "running"}:
+                if job.status in {"queued", "running"} and job.stage not in {"waiting_for_printer", "starting"}:
                     self.db.finish(job.id, error="interrupted by a cad2print restart; run it again")
+                elif job.stage == "starting":
+                    self._dispatched_at.setdefault(job.id, self.clock())
             self._thread = threading.Thread(target=self._loop, name="cad2print-worker", daemon=True)
             self._thread.start()
 
