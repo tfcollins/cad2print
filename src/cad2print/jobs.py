@@ -10,6 +10,7 @@ import queue
 import shutil
 import threading
 import time
+import zipfile
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -169,7 +170,7 @@ class JobRunner:
         try:
             plate3mf.finalize_plate(result.out_path, thumbnail_png=self._thumbnail_for(job),
                                     printer_model_id=plate3mf.printer_model_id_for(preset.machine))
-        except (OSError, ValueError) as e:
+        except (OSError, ValueError, zipfile.BadZipFile) as e:
             self.db.finish(job.id, error=f"could not finalize the sliced plate: {e}", log_tail=result.log_tail,
                            duration_s=time.monotonic() - start)
             return

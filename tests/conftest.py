@@ -42,7 +42,8 @@ class FakeOnshape:
 
 
 def fake_slice(cmd, expected_output, timeout_s, tail_lines):
-    Path(expected_output).write_bytes(b"3MF")
+    from tests.test_plate3mf import write_minimal_plate
+    write_minimal_plate(Path(expected_output))
     return SliceResult(True, Path(expected_output), 0, 0.01, "sliced ok")
 
 
